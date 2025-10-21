@@ -1,17 +1,22 @@
 import 'package:azkar_app/screens/home_screen.dart';
 import 'package:azkar_app/screens/splash_screen.dart'; 
+import 'package:azkar_app/services/prayer_notification_service.dart'; 
 import 'package:device_preview/device_preview.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  await PrayerNotificationService().initialize();
+  await PrayerNotificationService().requestPermissions();
   
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
 
+  // تغيير لون الـ Status Bar
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -40,7 +45,7 @@ class AzkArpp extends StatelessWidget {
       locale: DevicePreview.locale(context),
       builder: DevicePreview.appBuilder,
       debugShowCheckedModeBanner: false,
-      title: 'Sakeena',
+      title: 'تطبيق الأذكار',
       theme: ThemeData(
         primaryColor: const Color(0xFF5F7C7A),
         colorScheme: ColorScheme.fromSeed(
@@ -51,8 +56,8 @@ class AzkArpp extends StatelessWidget {
       
       initialRoute: '/',
       routes: {
-        '/': (context) => const SplashScreen(),      
-        '/home': (context) => const HomeScreen(),      
+        '/': (context) => const SplashScreen(),       
+        '/home': (context) => const HomeScreen(),     
       },
     );
   }
