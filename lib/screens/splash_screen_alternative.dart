@@ -123,7 +123,7 @@ class _SplashScreenWithImageState extends State<SplashScreenWithImage>
                       child: Column(
                         children: [
                           const Text(
-                            'أذكاري',
+                            'Sakeena',
                             style: TextStyle(
                               fontSize: 42,
                               fontWeight: FontWeight.bold,
