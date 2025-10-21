@@ -14,7 +14,6 @@ class MainContentSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      // 🎨 الخلفية البيضاء مع الحواف الدائرية
       width: double.infinity, // Infinite width
       margin: EdgeInsets.zero, // No horizontal margins (infinite from sides)
       padding: const EdgeInsets.fromLTRB(
@@ -40,7 +39,7 @@ class MainContentSection extends StatelessWidget {
       ),
       child: Column(
         children: [
-          // ✨ Prayer Times Container added here
+          //  Prayer Times Container added here
           _buildPrayerTimesContainer(),
           const SizedBox(height: 30),
           _buildDuaaCard(),

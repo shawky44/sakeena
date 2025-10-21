@@ -1,5 +1,5 @@
 import 'package:azkar_app/screens/home_screen.dart';
-import 'package:azkar_app/screens/splash_screen.dart'; // ⬅️ استيراد الـ Splash Screen
+import 'package:azkar_app/screens/splash_screen.dart'; 
 import 'package:device_preview/device_preview.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -7,13 +7,11 @@ import 'package:flutter/services.dart';
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // تثبيت اتجاه الشاشة على Portrait فقط
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
 
-  // تغيير لون الـ Status Bar
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -25,7 +23,7 @@ void main() {
 
   runApp(
     DevicePreview(
-      enabled: true,
+      enabled: false,
       builder: (context) => const AzkArpp(),
     ),
   );
@@ -42,7 +40,7 @@ class AzkArpp extends StatelessWidget {
       locale: DevicePreview.locale(context),
       builder: DevicePreview.appBuilder,
       debugShowCheckedModeBanner: false,
-      title: 'تطبيق الأذكار',
+      title: 'Sakeena',
       theme: ThemeData(
         primaryColor: const Color(0xFF5F7C7A),
         colorScheme: ColorScheme.fromSeed(
@@ -51,11 +49,10 @@ class AzkArpp extends StatelessWidget {
         useMaterial3: true,
       ),
       
-      // ⬅️ هنا الجزء المهم: نبدأ بالـ Splash Screen
       initialRoute: '/',
       routes: {
-        '/': (context) => const SplashScreen(),        // الصفحة الأولى
-        '/home': (context) => const HomeScreen(),      // الصفحة الرئيسية
+        '/': (context) => const SplashScreen(),      
+        '/home': (context) => const HomeScreen(),      
       },
     );
   }
