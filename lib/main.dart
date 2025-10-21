@@ -1,22 +1,19 @@
 import 'package:azkar_app/screens/home_screen.dart';
-import 'package:azkar_app/screens/splash_screen.dart'; 
-import 'package:azkar_app/services/prayer_notification_service.dart'; 
+import 'package:azkar_app/screens/splash_screen.dart';
+import 'package:azkar_app/services/prayer_notification_service.dart';
 import 'package:device_preview/device_preview.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
-  await PrayerNotificationService().initialize();
-  await PrayerNotificationService().requestPermissions();
-  
+  await PrayerNotificationService().ensureInitialized();
+
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
 
-  // تغيير لون الـ Status Bar
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -40,7 +37,6 @@ class AzkArpp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      // ignore: deprecated_member_use
       useInheritedMediaQuery: true,
       locale: DevicePreview.locale(context),
       builder: DevicePreview.appBuilder,
@@ -53,7 +49,6 @@ class AzkArpp extends StatelessWidget {
         ),
         useMaterial3: true,
       ),
-      
       initialRoute: '/',
       routes: {
         '/': (context) => const SplashScreen(),
