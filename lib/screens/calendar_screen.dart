@@ -674,6 +674,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   color: color,
                   shape: BoxShape.circle,
                   border: Border.all(
+                    // ignore: deprecated_member_use
                     color: currentColor.value == color.value
                         ? Colors.black
                         : Colors.grey,

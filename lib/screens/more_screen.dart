@@ -38,7 +38,7 @@ class MoreScreen extends StatelessWidget {
                     _buildMenuCard(
                       context,
                       icon: Icons.blur_circular,
-                      title: 'السبحة الإلكترونية',
+                      title: 'المسبحة الإلكترونية',
                       color: const Color.fromARGB(255, 36, 59, 68),
                       onTap: () {
                         Navigator.push(
@@ -63,20 +63,6 @@ class MoreScreen extends StatelessWidget {
                         );
                       },
                     ),
-                    // _buildMenuCard(
-                    //   context,
-                    //   icon: Icons.alarm,
-                    //   title: 'المنبه',
-                    //   color: const Color.fromARGB(255, 202, 153, 111),
-                    //   onTap: () {
-                    //     Navigator.push(
-                    //       context,
-                    //       MaterialPageRoute(
-                    //         builder: (context) => const AlarmScreen(),
-                    //       ),
-                    //     );
-                    //   },
-                    // ),
                     _buildMenuCard(
                       context,
                       icon: Icons.calendar_month,
