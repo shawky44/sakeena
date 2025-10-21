@@ -45,7 +45,7 @@ class AzkArpp extends StatelessWidget {
       locale: DevicePreview.locale(context),
       builder: DevicePreview.appBuilder,
       debugShowCheckedModeBanner: false,
-      title: 'تطبيق الأذكار',
+      title: 'Sakeena',
       theme: ThemeData(
         primaryColor: const Color(0xFF5F7C7A),
         colorScheme: ColorScheme.fromSeed(
@@ -56,8 +56,8 @@ class AzkArpp extends StatelessWidget {
       
       initialRoute: '/',
       routes: {
-        '/': (context) => const SplashScreen(),       
-        '/home': (context) => const HomeScreen(),     
+        '/': (context) => const SplashScreen(),
+        '/home': (context) => const HomeScreen(),
       },
     );
   }

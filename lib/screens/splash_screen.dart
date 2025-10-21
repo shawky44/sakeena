@@ -43,7 +43,7 @@ class _SplashScreenState extends State<SplashScreen>
 
     _controller.forward();
 
-    Timer(const Duration(seconds: 3), () {
+    Timer(const Duration(seconds: 5), () {
       if (mounted) {
         Navigator.of(context).pushReplacementNamed('/home');
       }
@@ -88,17 +88,17 @@ class _SplashScreenState extends State<SplashScreen>
                       width: 180,
                       height: 180,
                       padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: .3),
-                            blurRadius: 40,
-                            spreadRadius: 5,
-                          ),
-                        ],
-                      ),
+                      // decoration: BoxDecoration(
+                      //   color: const Color(0xFF3C5553),
+                      //   shape: BoxShape.circle,
+                      //   boxShadow: [
+                      //     BoxShadow(
+                      //       color: Colors.black.withValues(alpha: .3),
+                      //       blurRadius: 40,
+                      //       spreadRadius: 5,
+                      //     ),
+                      //   ],
+                      // ),
                       child: Image.asset(
                         'assets/images/logo.png', // ضع مسار الصورة هنا
                         errorBuilder: (context, error, stackTrace) {
