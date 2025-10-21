@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:vibration/vibration.dart';
 import '../models/zikr_model.dart';
 import '../services/azkar_settings_service.dart';
 
@@ -15,7 +16,7 @@ class AzkarCard extends StatefulWidget {
 
 class _AzkarCardState extends State<AzkarCard> {
   final AzkarSettingsService _settingsService = AzkarSettingsService();
-  
+
   double _fontSize = 24.0;
   Color _cardColor = const Color.fromARGB(240, 230, 237, 205);
 
@@ -42,7 +43,7 @@ class _AzkarCardState extends State<AzkarCard> {
         widget.zikr.increment();
       });
       // Vibration عادي (متوسط)
-      HapticFeedback.vibrate();
+      Vibration.vibrate(duration: 50);
       // لو خلص العداد
       if (widget.zikr.isCompleted) {
         HapticFeedback.mediumImpact();
@@ -63,7 +64,7 @@ class _AzkarCardState extends State<AzkarCard> {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: _incrementCount, 
+      onTap: _incrementCount,
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         padding: const EdgeInsets.all(20),
@@ -86,7 +87,7 @@ class _AzkarCardState extends State<AzkarCard> {
               widget.zikr.text,
               textAlign: TextAlign.center,
               style: TextStyle(
-                fontSize: _fontSize, 
+                fontSize: _fontSize,
                 height: 2.0,
                 fontWeight: FontWeight.w500,
                 color: const Color(0xFF2C3E50),
@@ -127,7 +128,7 @@ class _AzkarCardState extends State<AzkarCard> {
                   decoration: BoxDecoration(
                     color: widget.zikr.isCompleted
                         ? const Color.fromARGB(229, 167, 129, 101)
-                        : const Color(0xFF5F7C7A), 
+                        : const Color(0xFF5F7C7A),
                     borderRadius: BorderRadius.circular(25),
                     boxShadow: [
                       BoxShadow(
