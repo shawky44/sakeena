@@ -17,11 +17,11 @@ class PrayerNotificationService {
   static const String _reminderChannelId = 'prayer_reminders';
 
   static const Map<String, String> prayerReminderMessages = {
-    'الفجر': 'حان موعد صلاة الفجر بعد 15 دقيقة. استعد للصلاة',
-    'الظهر': 'حان موعد صلاة الظهر بعد 15 دقيقة. استعد للصلاة',
-    'العصر': 'حان موعد صلاة العصر بعد 15 دقيقة. استعد للصلاة',
-    'المغرب': 'حان موعد صلاة المغرب بعد 15 دقيقة. استعد للصلاة',
-    'العشاء': 'حان موعد صلاة العشاء بعد 15 دقيقة. استعد للصلاة',
+    'الفجر': ' صلاة الفجر بعد 15 دقيقة. استعد للصلاة',
+    'الظهر': '  صلاة الظهر بعد 15 دقيقة. استعد للصلاة',
+    'العصر': '  صلاة العصر بعد 15 دقيقة. استعد للصلاة',
+    'المغرب': '  صلاة المغرب بعد 15 دقيقة. استعد للصلاة',
+    'العشاء': '  صلاة العشاء بعد 15 دقيقة. استعد للصلاة',
   };
 
   static const Map<String, String> prayerAdhanMessages = {
@@ -85,7 +85,7 @@ class PrayerNotificationService {
         await _scheduleNotification(
           id: notificationId++,
           title: '⏰ تذكير صلاة $prayerName',
-          body: prayerReminderMessages[prayerName] ?? 'حان موعد الصلاة بعد 15 دقيقة',
+          body: prayerReminderMessages[prayerName] ?? '  الصلاة بعد 15 دقيقة',
           scheduledTime: reminderTime,
           withAdhan: false,
           payload: '${prayerName}_reminder',
