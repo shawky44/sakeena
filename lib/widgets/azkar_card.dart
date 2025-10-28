@@ -14,11 +14,15 @@ class AzkarCard extends StatefulWidget {
   State<AzkarCard> createState() => _AzkarCardState();
 }
 
-class _AzkarCardState extends State<AzkarCard> {
+class _AzkarCardState extends State<AzkarCard> with AutomaticKeepAliveClientMixin {
   final AzkarSettingsService _settingsService = AzkarSettingsService();
 
   double _fontSize = 24.0;
   Color _cardColor = const Color.fromARGB(240, 230, 237, 205);
+  bool _isLoading = true;
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
@@ -33,6 +37,7 @@ class _AzkarCardState extends State<AzkarCard> {
       setState(() {
         _fontSize = fontSize;
         _cardColor = cardColor;
+        _isLoading = false;
       });
     }
   }
@@ -42,9 +47,7 @@ class _AzkarCardState extends State<AzkarCard> {
       setState(() {
         widget.zikr.increment();
       });
-      // Vibration عادي (متوسط)
       Vibration.vibrate(duration: 50);
-      // لو خلص العداد
       if (widget.zikr.isCompleted) {
         HapticFeedback.mediumImpact();
         widget.onCountChanged?.call();
@@ -63,137 +66,159 @@ class _AzkarCardState extends State<AzkarCard> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
+    
+    if (_isLoading) {
+      return Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        height: 150,
+        decoration: BoxDecoration(
+          color: Colors.grey[200],
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: const Center(
+          child: SizedBox(
+            width: 24,
+            height: 24,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      );
+    }
+
     return GestureDetector(
       onTap: _incrementCount,
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: _cardColor, // استخدام اللون من الإعدادات
+          color: _cardColor,
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: .2),
-              blurRadius: 20,
-              offset: const Offset(0, 4),
+              color: Colors.black.withValues(alpha: .1),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
             ),
           ],
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // نص الذكر
-            Text(
-              widget.zikr.text,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: _fontSize,
-                height: 2.0,
-                fontWeight: FontWeight.w500,
-                color: const Color(0xFF2C3E50),
-              ),
-            ),
-
-            // الفضل (إن وجد)
-            if (widget.zikr.reference != null) ...[
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color.fromARGB(99, 85, 111, 110),
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: Text(
-                  widget.zikr.reference!,
+        child: Material(
+          color: Colors.transparent,
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  widget.zikr.text,
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: _fontSize - 2, // خط الفضل أصغر شوية
-                    color: const Color.fromARGB(255, 255, 255, 255),
-                    height: 1.6,
+                    fontSize: _fontSize,
+                    height: 2.0,
+                    fontWeight: FontWeight.w500,
+                    color: const Color(0xFF2C3E50),
                   ),
                 ),
-              ),
-            ],
 
-            const SizedBox(height: 20),
-
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: widget.zikr.isCompleted
-                        ? const Color.fromARGB(229, 167, 129, 101)
-                        : const Color(0xFF5F7C7A),
-                    borderRadius: BorderRadius.circular(25),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: .25),
-                        blurRadius: 15,
-                        offset: const Offset(0, 4),
+                if (widget.zikr.reference != null) ...[
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color.fromARGB(99, 85, 111, 110),
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    child: Text(
+                      widget.zikr.reference!,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: _fontSize - 2,
+                        color: const Color.fromARGB(255, 255, 255, 255),
+                        height: 1.6,
                       ),
-                    ],
+                    ),
                   ),
-                  child: widget.zikr.isCompleted
-                      ? const Row(
+                ],
+
+                const SizedBox(height: 20),
+
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: widget.zikr.isCompleted
+                            ? const Color.fromARGB(229, 167, 129, 101)
+                            : const Color(0xFF5F7C7A),
+                        borderRadius: BorderRadius.circular(25),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: .15),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: widget.zikr.isCompleted
+                          ? const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.check_rounded,
+                                  color: Colors.white,
+                                  size: 26,
+                                ),
+                              ],
+                            )
+                          : Text(
+                              '${widget.zikr.currentCount}/${widget.zikr.count}',
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                    ),
+                  ],
+                ),
+
+                if (widget.zikr.currentCount > 0) ...[
+                  const SizedBox(height: 12),
+                  Center(
+                    child: InkWell(
+                      onTap: _resetCount,
+                      borderRadius: BorderRadius.circular(20),
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
-                              Icons.check_rounded,
-                              color: Colors.white,
-                              size: 26,
+                              Icons.refresh_rounded,
+                              size: 18,
+                              color: Color(0xFF5F7C7A),
+                            ),
+                            SizedBox(width: 6),
+                            Text(
+                              'إعادة',
+                              style: TextStyle(
+                                color: Color(0xFF5F7C7A),
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ],
-                        )
-                      : Text(
-                          '${widget.zikr.currentCount}/${widget.zikr.count}',
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
                         ),
-                ),
-              ],
-            ),
-
-            // زر إعادة
-            if (widget.zikr.currentCount > 0) ...[
-              const SizedBox(height: 12),
-              Center(
-                child: InkWell(
-                  onTap: _resetCount,
-                  borderRadius: BorderRadius.circular(20),
-                  child: const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.refresh_rounded,
-                          size: 18,
-                          color: Color(0xFF5F7C7A),
-                        ),
-                        SizedBox(width: 6),
-                        Text(
-                          'إعادة',
-                          style: TextStyle(
-                            color: Color(0xFF5F7C7A),
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   ),
-                ),
-              ),
-            ],
-          ],
+                ],
+              ],
+            ),
+          ),
         ),
       ),
     );
