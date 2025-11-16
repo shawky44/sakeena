@@ -107,7 +107,7 @@ class MoreScreen extends StatelessWidget {
                     ),
                     _buildMenuCardWithImage(
                       context,
-                      imagePath: 'assets/images/allah_icon.png', // Add your image here
+                      imagePath: 'assets/images/allah_icon.png',
                       title: 'أسماء الله الحسنى',
                       color: const Color.fromARGB(255, 8, 9, 9),
                       onTap: () {

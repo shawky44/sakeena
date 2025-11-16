@@ -46,7 +46,6 @@ class _CustomAzkarDialogState extends State<CustomAzkarDialog> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // العنوان
                 Row(
                   children: [
                     Container(
@@ -80,7 +79,6 @@ class _CustomAzkarDialogState extends State<CustomAzkarDialog> {
                 ),
                 const SizedBox(height: 24),
 
-                // حقل نص الذكر
                 TextFormField(
                   controller: _textController,
                   maxLines: 5,
@@ -115,7 +113,6 @@ class _CustomAzkarDialogState extends State<CustomAzkarDialog> {
                 ),
                 const SizedBox(height: 16),
 
-                // حقل العدد
                 TextFormField(
                   controller: _countController,
                   keyboardType: TextInputType.number,
@@ -154,7 +151,6 @@ class _CustomAzkarDialogState extends State<CustomAzkarDialog> {
                 ),
                 const SizedBox(height: 24),
 
-                // أزرار الحفظ والإلغاء
                 Row(
                   children: [
                     Expanded(

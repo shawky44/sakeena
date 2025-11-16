@@ -26,7 +26,7 @@ class TodoSection {
   Color backgroundColor;
   ItemShape itemShape;
   List<TodoItem> items;
-  bool isSpecialPrayerSection; // 🆕 علامة للسكشن المميز
+  bool isSpecialPrayerSection;
 
   TodoSection({
     required this.title,
@@ -34,7 +34,7 @@ class TodoSection {
     required this.backgroundColor,
     required this.itemShape,
     required this.items,
-    this.isSpecialPrayerSection = false, // 🆕
+    this.isSpecialPrayerSection = false, 
   });
 
   void sortItems() {
@@ -51,7 +51,7 @@ class TodoSection {
     'backgroundColorValue': backgroundColor.value,
     'itemShape': itemShape.index,
     'items': items.map((item) => item.toJson()).toList(),
-    'isSpecialPrayerSection': isSpecialPrayerSection, // 🆕
+    'isSpecialPrayerSection': isSpecialPrayerSection, 
   };
 
   factory TodoSection.fromJson(Map<String, dynamic> json) => TodoSection(
@@ -62,7 +62,7 @@ class TodoSection {
     items: (json['items'] as List)
         .map((item) => TodoItem.fromJson(item))
         .toList(),
-    isSpecialPrayerSection: json['isSpecialPrayerSection'] ?? false, // 🆕
+    isSpecialPrayerSection: json['isSpecialPrayerSection'] ?? false, 
   );
 }
 
@@ -100,16 +100,15 @@ class _TodoScreenState extends State<TodoScreen> with TickerProviderStateMixin {
   final TextEditingController _newSectionController = TextEditingController();
   final TextEditingController _newPageController = TextEditingController();
   bool _isLoading = true;
-  Timer? _midnightTimer; // 🆕 Timer لمنتصف الليل
+  Timer? _midnightTimer; 
 
   @override
   void initState() {
     super.initState();
     _loadData();
-    _scheduleMidnightRefresh(); // 🆕 جدولة التحديث اليومي
+    _scheduleMidnightRefresh(); 
   }
 
-  // 🆕 دالة لجدولة تحديث منتصف الليل
   void _scheduleMidnightRefresh() {
     final now = DateTime.now();
     final nextMidnight = DateTime(now.year, now.month, now.day + 1, 0, 0, 0);
@@ -120,11 +119,10 @@ class _TodoScreenState extends State<TodoScreen> with TickerProviderStateMixin {
 
     _midnightTimer = Timer(durationUntilMidnight, () {
       _resetPrayerSection();
-      _scheduleMidnightRefresh(); // جدول التحديث القادم
+      _scheduleMidnightRefresh();
     });
   }
 
-  // 🆕 دالة لإعادة تعيين سكشن الصلوات
   Future<void> _resetPrayerSection() async {
     debugPrint('🔄 بدء إعادة تعيين الصلوات...');
     
@@ -132,20 +130,16 @@ class _TodoScreenState extends State<TodoScreen> with TickerProviderStateMixin {
     final String currentDate = DateTime.now().toIso8601String().split('T')[0];
     final String? lastResetDate = prefs.getString('last_prayer_reset_date');
 
-    // تحقق إذا تم التحديث اليوم
     if (lastResetDate == currentDate) {
       debugPrint('✅ تم التحديث بالفعل اليوم');
       return;
     }
 
     setState(() {
-      // ابحث عن صفحة الصلوات
       for (var page in _pages) {
         if (page.title == "🕌 الصلوات الخمس") {
-          // ابحث عن سكشن الصلوات الخمس
           for (var i = 0; i < page.sections.length; i++) {
             if (page.sections[i].isSpecialPrayerSection) {
-              // أعد تعيين السكشن بالقيم الافتراضية
               page.sections[i] = _getDefaultPrayerSection();
               debugPrint('✅ تم تحديث سكشن الصلوات بنجاح');
               break;
@@ -156,21 +150,19 @@ class _TodoScreenState extends State<TodoScreen> with TickerProviderStateMixin {
       }
     });
 
-    // احفظ التاريخ الجديد
     await prefs.setString('last_prayer_reset_date', currentDate);
     await _saveData();
     
     debugPrint('✅ اكتمل تحديث الصلوات للتاريخ: $currentDate');
   }
 
-  // 🆕 دالة للحصول على السكشن الافتراضي للصلوات
   TodoSection _getDefaultPrayerSection() {
     return TodoSection(
       title: "Five Prayers",
       icon: Icons.access_time,
       backgroundColor: Colors.green.shade50,
       itemShape: ItemShape.rounded,
-      isSpecialPrayerSection: true, // 🆕 علامة مميزة
+      isSpecialPrayerSection: true, 
       items: [
         TodoItem(title: "Fajr (الفجر)", isCompleted: false),
         TodoItem(title: "Dhuhr (الظهر)", isCompleted: false),
@@ -199,7 +191,6 @@ class _TodoScreenState extends State<TodoScreen> with TickerProviderStateMixin {
       _pages = _getDefaultPages();
     }
 
-    // 🆕 تحقق إذا كان يجب إعادة تعيين الصلوات عند فتح التطبيق
     await _checkAndResetIfNeeded();
 
     _tabController = TabController(length: _pages.length, vsync: this);
@@ -214,7 +205,6 @@ class _TodoScreenState extends State<TodoScreen> with TickerProviderStateMixin {
     });
   }
 
-  // 🆕 تحقق إذا كان يجب إعادة التعيين عند فتح التطبيق
   Future<void> _checkAndResetIfNeeded() async {
     final prefs = await SharedPreferences.getInstance();
     final String currentDate = DateTime.now().toIso8601String().split('T')[0];
@@ -241,7 +231,7 @@ class _TodoScreenState extends State<TodoScreen> with TickerProviderStateMixin {
       TodoPage(
         title: "🕌 الصلوات الخمس",
         sections: [
-          _getDefaultPrayerSection(), // 🆕 استخدم الدالة الجديدة
+          _getDefaultPrayerSection(), 
         ],
       ),
     ];
@@ -249,7 +239,7 @@ class _TodoScreenState extends State<TodoScreen> with TickerProviderStateMixin {
 
   @override
   void dispose() {
-    _midnightTimer?.cancel(); // 🆕 إلغاء Timer عند الخروج
+    _midnightTimer?.cancel(); 
     _tabController.dispose();
     _newItemController.dispose();
     _newSectionController.dispose();
@@ -449,7 +439,6 @@ class _TodoScreenState extends State<TodoScreen> with TickerProviderStateMixin {
                     ),
                   ),
                 ),
-                // 🆕 إخفاء أزرار التحكم للسكشن المميز
                 if (!section.isSpecialPrayerSection) ...[
                   IconButton(
                     icon: const Icon(Icons.color_lens, size: 20),
@@ -467,7 +456,6 @@ class _TodoScreenState extends State<TodoScreen> with TickerProviderStateMixin {
                     tooltip: 'Delete Section',
                   ),
                 ] else ...[
-                  // 🆕 علامة للسكشن المميز
                   const Padding(
                     padding: EdgeInsets.only(right: 8.0),
                     child: Icon(Icons.auto_awesome, color: Colors.amber, size: 20),
@@ -526,7 +514,6 @@ class _TodoScreenState extends State<TodoScreen> with TickerProviderStateMixin {
             color: item.isCompleted ? Colors.grey : Colors.black,
           ),
         ),
-        // 🆕 إخفاء زر الحذف للعناصر في السكشن المميز
         trailing: !section.isSpecialPrayerSection
             ? IconButton(
                 icon: const Icon(Icons.delete, size: 18),

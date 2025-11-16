@@ -514,7 +514,6 @@ class AllahNamesScreen extends StatelessWidget {
                 borderRadius: BorderRadius.circular(20),
                 child: Stack(
                   children: [
-                    // الخلفية
                     Positioned.fill(
                       child: Opacity(
                         opacity: 0.78,
@@ -524,13 +523,11 @@ class AllahNamesScreen extends StatelessWidget {
                         ),
                       ),
                     ),
-                    // المحتوى
                     Padding(
                       padding: const EdgeInsets.all(8),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
-                          // الوصف
                           Expanded(
                             child: Container(
                               padding: const EdgeInsets.symmetric(
@@ -568,7 +565,6 @@ class AllahNamesScreen extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(width: 12),
-                          // الاسم في دائرة
                           Transform.translate(
                             offset: const Offset(0, -12),
                             child: Container(

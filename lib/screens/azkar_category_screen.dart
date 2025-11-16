@@ -6,8 +6,9 @@ class AzkarCategoryScreen extends StatefulWidget {
   final String title;
   final List<Zikr> azkarList;
   final Color themeColor;
-  final bool isCustomAzkar; // معرفة إذا كانت وردي الخاص
-  final Function(int)? onDeleteZikr; // دالة لحذف ذكر
+  final bool isCustomAzkar;
+  final Function(int)? onDeleteZikr;
+  final Function(int, int)? onReorder;
 
   const AzkarCategoryScreen({
     super.key,
@@ -16,6 +17,7 @@ class AzkarCategoryScreen extends StatefulWidget {
     this.themeColor = const Color(0xFF5F7C7A),
     this.isCustomAzkar = false,
     this.onDeleteZikr,
+    this.onReorder,
   });
 
   @override
@@ -80,7 +82,7 @@ class _AzkarCategoryScreenState extends State<AzkarCategoryScreen> {
               setState(() {});
             },
             style: TextButton.styleFrom(
-              foregroundColor: const Color.fromARGB(255, 0, 0, 0),
+              foregroundColor: Colors.red,
             ),
             child: const Text('حذف'),
           ),
@@ -102,7 +104,6 @@ class _AzkarCategoryScreenState extends State<AzkarCategoryScreen> {
         foregroundColor: Colors.white,
         elevation: 0,
         actions: [
-          // عداد الإنجاز
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -124,7 +125,6 @@ class _AzkarCategoryScreenState extends State<AzkarCategoryScreen> {
               ],
             ),
           ),
-          // زر إعادة تعيين الكل
           IconButton(
             onPressed: _resetAll,
             icon: const Icon(Icons.refresh_rounded),
@@ -134,7 +134,6 @@ class _AzkarCategoryScreenState extends State<AzkarCategoryScreen> {
       ),
       body: Column(
         children: [
-          // شريط التقدم
           Container(
             height: 6,
             color: widget.themeColor.withValues(alpha: .2),
@@ -146,7 +145,7 @@ class _AzkarCategoryScreenState extends State<AzkarCategoryScreen> {
               valueColor: AlwaysStoppedAnimation<Color>(widget.themeColor),
             ),
           ),
-          // رسالة لو الورد فاضي
+          
           if (widget.azkarList.isEmpty)
             Expanded(
               child: Center(
@@ -168,14 +167,24 @@ class _AzkarCategoryScreenState extends State<AzkarCategoryScreen> {
               ),
             )
           else
-            // قائمة الأذكار (تحت بعض - Scrollable)
             Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                itemCount: widget.azkarList.length,
-                itemBuilder: (context, index) {
-                  return widget.isCustomAzkar
-                      ? Dismissible(
+              child: widget.isCustomAzkar
+                  ? ReorderableListView.builder(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      itemCount: widget.azkarList.length,
+                      onReorder: (oldIndex, newIndex) {
+                        widget.onReorder?.call(oldIndex, newIndex);
+                        setState(() {});
+                      },
+                      proxyDecorator: (child, index, animation) {
+                        return Material(
+                          elevation: 8,
+                          borderRadius: BorderRadius.circular(20),
+                          child: child,
+                        );
+                      },
+                      itemBuilder: (context, index) {
+                        return Dismissible(
                           key: Key(widget.azkarList[index].id),
                           direction: DismissDirection.endToStart,
                           background: Container(
@@ -184,14 +193,14 @@ class _AzkarCategoryScreenState extends State<AzkarCategoryScreen> {
                               vertical: 8,
                             ),
                             decoration: BoxDecoration(
-                              color: const Color.fromARGB(255, 0, 0, 0),
+                              color: Colors.red,
                               borderRadius: BorderRadius.circular(20),
                             ),
                             alignment: Alignment.centerLeft,
                             padding: const EdgeInsets.only(left: 24),
                             child: const Icon(
                               Icons.delete_rounded,
-                              color: Color.fromARGB(255, 0, 0, 0),
+                              color: Colors.white,
                               size: 32,
                             ),
                           ),
@@ -220,12 +229,7 @@ class _AzkarCategoryScreenState extends State<AzkarCategoryScreen> {
                                     onPressed: () =>
                                         Navigator.pop(context, true),
                                     style: TextButton.styleFrom(
-                                      foregroundColor: const Color.fromARGB(
-                                        255,
-                                        0,
-                                        0,
-                                        0,
-                                      ),
+                                      foregroundColor: Colors.red,
                                     ),
                                     child: const Text('حذف'),
                                   ),
@@ -244,7 +248,23 @@ class _AzkarCategoryScreenState extends State<AzkarCategoryScreen> {
                                   setState(() {});
                                 },
                               ),
-                              // زر الحذف في الزاوية
+                              Positioned(
+                                top: 16,
+                                right: 24,
+                                child: Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: widget.themeColor.withValues(alpha: .1),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Icon(
+                                    Icons.drag_handle_rounded,
+                                    color: widget.themeColor,
+                                    size: 17,
+                                  ),
+                                ),
+                              ),
+
                               Positioned(
                                 top: 16,
                                 left: 24,
@@ -259,15 +279,21 @@ class _AzkarCategoryScreenState extends State<AzkarCategoryScreen> {
                               ),
                             ],
                           ),
-                        )
-                      : AzkarCard(
+                        );
+                      },
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      itemCount: widget.azkarList.length,
+                      itemBuilder: (context, index) {
+                        return AzkarCard(
                           zikr: widget.azkarList[index],
                           onCountChanged: () {
                             setState(() {});
                           },
                         );
-                },
-              ),
+                      },
+                    ),
             ),
         ],
       ),

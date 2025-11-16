@@ -1,21 +1,18 @@
 import 'dart:async';
 import 'dart:math';
-import 'dart:ui';
+import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
-/// خدمة بوب اب الأذكار - بسيطة وفعالة
 class ZikrPopupNotification {
-  static final ZikrPopupNotification _instance =
-      ZikrPopupNotification._internal();
+  static final ZikrPopupNotification _instance = ZikrPopupNotification._internal();
   factory ZikrPopupNotification() => _instance;
   ZikrPopupNotification._internal();
 
-  final FlutterLocalNotificationsPlugin _notifications =
-      FlutterLocalNotificationsPlugin();
+  final FlutterLocalNotificationsPlugin _notifications = FlutterLocalNotificationsPlugin();
   Timer? _timer;
   bool _isInitialized = false;
+  int _notificationId = 2000; // Start from 2000 to avoid conflicts
 
-  /// قائمة الأذكار
   static const List<String> azkarList = [
     'سُبْحَانَ اللهِ وَبِحَمْدِهِ',
     'لَا إِلَهَ إِلَّا اللَّهُ وَحْدَهُ لَا شَرِيكَ لَهُ',
@@ -66,10 +63,10 @@ class ZikrPopupNotification {
     'اللَّهُمَّ اجْعَلْنِي شَاكِرًا لِنِعَمِكَ',
     'رَبِّ أَعُوذُ بِكَ مِنْ هَمَزَاتِ الشَّيَاطِينِ',
     'اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنَ الْفَقْرِ',
-    'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ مِلْءَ السَّمَاوَاتِ',
+    'سُبْحَانَ اللَّهِ الْعَظِيمِ وَبِحَمْدِهِ',
     'اللَّهُمَّ انْصُرْنِي عَلَى مَنْ بَغَى عَلَيَّ',
     'رَبَّنَا آمَنَّا فَاغْفِرْ لَنَا وَارْحَمْنَا',
-    'اللَّهُمَّ أَذْهِبْ عَنِّي الْغَمَّ وَالْحُزْنَ',
+    'اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنَ الْغَمَّ وَالْحُزْنَ',
     'سُبْحَانَ اللَّهِ الْعَلِيِّ الْأَعْلَى',
     'اللَّهُمَّ اجْعَلْنِي مِنَ الْمُخْلِصِينَ',
     'رَبِّ إِنِّي لِمَا أَنْزَلْتَ إِلَيَّ مِنْ خَيْرٍ فَقِيرٌ',
@@ -85,7 +82,7 @@ class ZikrPopupNotification {
     'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ عَدَدَ مَا كَانَ',
     'اللَّهُمَّ ارْزُقْنِي الْعِلْمَ النَّافِعَ',
     'رَبَّنَا هَبْ لَنَا مِنْ أَزْوَاجِنَا وَذُرِّيَّاتِنَا',
-    'اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنَ الْجُنُونِ',
+    'اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنَ الْعَجْزِ',
     'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ عَدَدَ مَا هُوَ خَالِقٌ',
     'اللَّهُمَّ اجْعَلْنِي مِنَ الْمُسْتَغْفِرِينَ',
     'رَبِّ اجْعَلْنِي شَكُورًا لِنِعْمَتِكَ',
@@ -93,62 +90,6 @@ class ZikrPopupNotification {
     'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ عَدَدَ الْأَنْهَارِ',
     'اللَّهُمَّ ارْحَمْنِي وَوَالِدَيَّ',
     'رَبَّنَا تَقَبَّلْ مِنَّا إِنَّكَ أَنْتَ السَّمِيعُ الْعَلِيمُ',
-    'اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنَ الْخِبْثِ',
-    'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ عَدَدَ الْجِبَالِ',
-    'اللَّهُمَّ اجْعَلْنِي مِنَ الْمُحْسِنِينَ',
-    'رَبِّ أَدْخِلْنِي مُدْخَلَ صِدْقٍ',
-    'اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنْ عَذَابِ النَّارِ',
-    'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ عَدَدَ الْبَحْرِ',
-    'اللَّهُمَّ ارْزُقْنِي الْحِكْمَةَ',
-    'رَبَّنَا اغْفِرْ لَنَا وَلِإِخْوَانِنَا',
-    'اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنَ الْغَفْلَةِ',
-    'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ عَدَدَ الْوَرَقِ',
-    'اللَّهُمَّ اجْعَلْنِي مِنَ الْمُتَّقِينَ',
-    'رَبِّ ارْحَمْهُمَا كَمَا رَبَّيَانِي صَغِيرًا',
-    'اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنَ الْقَسْوَةِ',
-    'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ عَدَدَ الرِّيَاحِ',
-    'اللَّهُمَّ ارْزُقْنِي الصِّدْقَ',
-    'رَبَّنَا لَا تَجْعَلْنَا فِتْنَةً لِلْقَوْمِ الظَّالِمِينَ',
-    'اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنَ السَّرَفِ',
-    'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ عَدَدَ الْحَصَى',
-    'اللَّهُمَّ اجْعَلْنِي مِنَ الْخَاشِعِينَ',
-    'رَبِّ انْصُرْنِي عَلَى الْقَوْمِ الْمُفْسِدِينَ',
-    'اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنَ الْخِذْلَانِ',
-    'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ عَدَدَ الْغُيُومِ',
-    'اللَّهُمَّ ارْزُقْنِي الْيَقِينَ',
-    'رَبَّنَا أَفْرِغْ عَلَيْنَا صَبْرًا',
-    'اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنَ الْوَسْوَسَةِ',
-    'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ عَدَدَ الْكَوَاكِبِ',
-    'اللَّهُمَّ اجْعَلْنِي مِنَ الْمُنْصِفِينَ',
-    'رَبِّ هَبْ لِي حُكْمًا وَأَلْحِقْنِي بِالصَّالِحِينَ',
-    'اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنْ شَرِّ الْحَسَدِ',
-    'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ عَدَدَ الْأَمْطَارِ',
-    'اللَّهُمَّ ارْزُقْنِي الْقُنُوعَ',
-    'رَبَّنَا آمَنَّا بِمَا أَنْزَلْتَ',
-    'اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنْ سُوءِ الْأَخْلَاقِ',
-    'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ عَدَدَ الْحَيَوَانَاتِ',
-    'اللَّهُمَّ اجْعَلْنِي مِنَ الْمُصْلِحِينَ',
-    'رَبِّ اجْعَلْنِي مِنَ الْمُقْسِطِينَ',
-    'اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنَ الْهَرَمِ',
-    'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ عَدَدَ الزَّهْرِ',
-    'اللَّهُمَّ ارْزُقْنِي الْعَفْوَ',
-    'رَبَّنَا لَا تُعَذِّبْنَا إِنْ نَسِينَا أَوْ أَخْطَأْنَا',
-    'اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنَ الْعَجْزِ',
-    'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ عَدَدَ الْحُبُوبِ',
-    'اللَّهُمَّ اجْعَلْنِي مِنَ الْمُتَحَابِّينَ',
-    'رَبِّ اغْفِرْ لِي وَلِوَالِدَيَّ وَلِلْمُؤْمِنِينَ',
-    'اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنَ الْبَطَرِ',
-    'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ عَدَدَ الْأَثْمَارِ',
-    'اللَّهُمَّ ارْزُقْنِي الْحَيَاءَ',
-    'رَبَّنَا اتَّبَعْنَا رُسُلَكَ',
-    'اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنْ شَرِّ السَّمَعِ',
-    'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ عَدَدَ الْأَزْهَارِ',
-    'اللَّهُمَّ اجْعَلْنِي مِنَ الْمُتَصَدِّقِينَ',
-    'رَبِّ ارْحَمْنِي وَوَالِدَيَّ',
-    'اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنَ الْفِتَنِ',
-    'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ عَدَدَ الْأَوْرَاقِ',
-    'اللَّهُمَّ ارْزُقْنِي الْإِخْلَاصَ',
-    'رَبَّنَا اغْفِرْ لَنَا وَلِوَالِدَيْنَا',
     'اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنَ الْغِرَّةِ',
     'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ عَدَدَ الْجَمَالِ',
     'اللَّهُمَّ اجْعَلْنِي مِنَ الصَّابِرِينَ',
@@ -212,124 +153,125 @@ class ZikrPopupNotification {
     'اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنَ الْهَمِّ',
   ];
 
-  /// تهيئة الخدمة
   Future<void> initialize() async {
     if (_isInitialized) return;
 
-    // إعدادات Android
-    const androidSettings = AndroidInitializationSettings(
-      '@mipmap/ic_launcher',
-    );
+    try {
+      const androidSettings = AndroidInitializationSettings(
+        '@mipmap/ic_launcher',
+      );
 
-    // إعدادات iOS
-    const iosSettings = DarwinInitializationSettings(
-      requestAlertPermission: true,
-      requestBadgePermission: false,
-      requestSoundPermission: true,
-    );
+      const iosSettings = DarwinInitializationSettings(
+        requestAlertPermission: true,
+        requestBadgePermission: false,
+        requestSoundPermission: true,
+      );
 
-    const initSettings = InitializationSettings(
-      android: androidSettings,
-      iOS: iosSettings,
-    );
+      const initSettings = InitializationSettings(
+        android: androidSettings,
+        iOS: iosSettings,
+      );
 
-    // عند الضغط على الإشعار → يختفي تلقائياً
-    await _notifications.initialize(
-      initSettings,
-      onDidReceiveNotificationResponse: (details) {
-        print('✅ Notification dismissed');
-      },
-    );
+      await _notifications.initialize(
+        initSettings,
+        onDidReceiveNotificationResponse: (details) {
+          debugPrint('Notification dismissed: ${details.payload}');
+        },
+      );
 
-    _isInitialized = true;
-    print('✅ Zikr popup notification initialized');
+      _isInitialized = true;
+      debugPrint('✅ Zikr popup notification initialized');
+    } catch (e) {
+      debugPrint('Error initializing zikr notifications: $e');
+    }
   }
 
-  /// بدء عرض الأذكار بشكل دوري
-  /// [intervalHours] - كل كم ساعة
-  Future<void> start({int intervalHours = 4}) async {
+  /// [intervalHours] -   
+  Future<void> start({int intervalHours = 3}) async {
     await initialize();
 
-    // إلغاء أي مؤقت سابق
     stop();
 
-    print('🚀 Starting zikr popup every $intervalHours hours');
+    debugPrint('🚀 Starting zikr popup every $intervalHours hours');
 
-    // بدء المؤقت
     _timer = Timer.periodic(Duration(hours: intervalHours), (_) {
       _showZikrPopup();
     });
 
-    // عرض أول ذكر بعد دقيقة (للاختبار - يمكنك حذف هذا السطر)
-    // Timer(const Duration(seconds: 10), _showZikrPopup);
+    // عرض أول ذكر بعد دقيقة للاختبار
+    // Timer(const Duration(minutes: 1), _showZikrPopup);
   }
 
   /// إيقاف الأذكار
   void stop() {
     _timer?.cancel();
     _timer = null;
-    print('⛔ Zikr popup stopped');
+    debugPrint('⛔ Zikr popup stopped');
   }
 
-  /// عرض بوب اب ذكر
   Future<void> _showZikrPopup() async {
+    if (!_isInitialized) {
+      await initialize();
+    }
+
     final zikr = azkarList[Random().nextInt(azkarList.length)];
+    _notificationId++;
 
-    await _notifications.show(
-      Random().nextInt(1000), // ID عشوائي
-      '🤲 اذكر الله يذكرك',
-      zikr,
-      NotificationDetails(
-        android: AndroidNotificationDetails(
-          'zikr_popup_channel',
-          'أذكار منبثقة',
-          channelDescription: 'أذكار تظهر على الشاشة',
-          importance: Importance.high,
-          priority: Priority.high,
+    try {
+      await _notifications.show(
+        _notificationId,
+        '🤲 اذكر الله يذكرك',
+        zikr,
+        NotificationDetails(
+          android: AndroidNotificationDetails(
+            'zikr_popup_channel',
+            'أذكار منبثقة',
+            channelDescription: 'أذكار تظهر على الشاشة',
+            importance: Importance.high,
+            priority: Priority.high,
+            
 
-          // ✅ هذا يجعلها تظهر كـ Heads-up (بوب اب في أعلى الشاشة)
-          fullScreenIntent: true,
+            
+            styleInformation: BigTextStyleInformation(
+              zikr,
+              htmlFormatBigText: false,
+              contentTitle: '🤲 اذكر الله يذكرك',
+              htmlFormatContentTitle: false,
+            ),
 
-          // تختفي تلقائياً بعد 12ثواني
-          timeoutAfter: 12000,
+            color: const Color(0xFF6B8F7F),
 
-          // تصميم النص الكبير
-          styleInformation: BigTextStyleInformation(
-            zikr,
-            htmlFormatBigText: true,
-            contentTitle: '🤲 اذكر الله يذكرك',
-            htmlFormatContentTitle: true,
+            playSound: true,
+            enableVibration: true,
+            enableLights: true,
+            ledColor: const Color(0xFF6B8F7F),
+            ledOnMs: 1000,
+            ledOffMs: 500,
+
+            icon: '@mipmap/ic_launcher',
           ),
-
-          // الألوان
-          color: const Color(0xFF6B8F7F),
-
-          // صوت وإضاءة
-          playSound: true,
-          enableVibration: true,
-          enableLights: true,
-          ledColor: const Color(0xFF6B8F7F),
-          ledOnMs: 1000,
-          ledOffMs: 500,
-
-          // الأيقونة
-          icon: '@mipmap/ic_launcher',
+          iOS: const DarwinNotificationDetails(
+            presentAlert: true,
+            presentBadge: false,
+            presentSound: true,
+            interruptionLevel: InterruptionLevel.timeSensitive,
+          ),
         ),
-        iOS: const DarwinNotificationDetails(
-          presentAlert: true,
-          presentBadge: false,
-          presentSound: true,
-          interruptionLevel: InterruptionLevel.timeSensitive,
-        ),
-      ),
-    );
+      );
 
-    print('💬 Zikr popup shown: $zikr');
+      debugPrint('💬 Zikr popup shown: $zikr');
+    } catch (e) {
+      debugPrint('Error showing zikr popup: $e');
+    }
   }
 
-  /// عرض ذكر فوري (للاختبار)
   Future<void> showNow() async {
     await initialize();
     await _showZikrPopup();
+  }
+
+  Future<void> cancelAll() async {
+    await _notifications.cancelAll();
+    debugPrint('All zikr notifications cancelled');
   }
 }

@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:vibration/vibration.dart';
@@ -14,7 +15,8 @@ class AzkarCard extends StatefulWidget {
   State<AzkarCard> createState() => _AzkarCardState();
 }
 
-class _AzkarCardState extends State<AzkarCard> with AutomaticKeepAliveClientMixin {
+class _AzkarCardState extends State<AzkarCard>
+    with AutomaticKeepAliveClientMixin {
   final AzkarSettingsService _settingsService = AzkarSettingsService();
 
   double _fontSize = 24.0;
@@ -64,10 +66,29 @@ class _AzkarCardState extends State<AzkarCard> with AutomaticKeepAliveClientMixi
     widget.onCountChanged?.call();
   }
 
+  void _copyZikr() {
+    Clipboard.setData(ClipboardData(text: widget.zikr.text));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text(
+          'تم نسخ الذكر',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontWeight: FontWeight.w600),
+        ),
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: const Color.fromARGB(188, 95, 124, 122),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(16),
+      ),
+    );
+    HapticFeedback.lightImpact();
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    
+
     if (_isLoading) {
       return Container(
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -115,7 +136,7 @@ class _AzkarCardState extends State<AzkarCard> with AutomaticKeepAliveClientMixi
                     fontSize: _fontSize,
                     height: 2.0,
                     fontWeight: FontWeight.w500,
-                    color: const Color(0xFF2C3E50),
+                    color: const Color.fromARGB(255, 80, 44, 44),
                   ),
                 ),
 
@@ -142,8 +163,19 @@ class _AzkarCardState extends State<AzkarCard> with AutomaticKeepAliveClientMixi
                 const SizedBox(height: 20),
 
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
+                    IconButton(
+                      onPressed: _copyZikr,
+                      icon: const Icon(Icons.copy_rounded),
+                      color: const Color(0xFF5F7C7A),
+                      iconSize: 20,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      tooltip: 'نسخ',
+                    ),
+
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 24,
@@ -182,6 +214,8 @@ class _AzkarCardState extends State<AzkarCard> with AutomaticKeepAliveClientMixi
                               ),
                             ),
                     ),
+
+                    const SizedBox(width: 40),
                   ],
                 ),
 
@@ -192,7 +226,10 @@ class _AzkarCardState extends State<AzkarCard> with AutomaticKeepAliveClientMixi
                       onTap: _resetCount,
                       borderRadius: BorderRadius.circular(20),
                       child: const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [

@@ -1,211 +1,43 @@
 // calendar_screen.dart
-import 'package:flutter/foundation.dart';
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:hijri/hijri_calendar.dart';
 import 'package:table_calendar/table_calendar.dart';
+import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http;
 
 class CalendarEvent {
   final String title;
   final String description;
   final DateTime date;
   final Color color;
-  final EventType type;
+  final String? hijriDate;
 
   const CalendarEvent({
     required this.title,
     required this.description,
     required this.date,
     required this.color,
-    required this.type,
-  });
-}
-
-enum EventType { islamicFestival, specialDay, gregorianHoliday, personal }
-
-class CalendarConfig {
-  final Color primaryColor;
-  final Color secondaryColor;
-  final Color backgroundColor;
-  final Color textColor;
-  final Color highlightColor;
-  final bool showIslamicDates;
-  final bool showGregorianDates;
-
-  const CalendarConfig({
-    this.primaryColor = const Color(0xFF6B8F7F),
-    this.secondaryColor = const Color.fromARGB(198, 133, 151, 143),
-    this.backgroundColor = const Color(0xFFD9D9D9),
-    this.textColor = Colors.black,
-    this.highlightColor = const Color.fromARGB(255, 58, 56, 40),
-    this.showIslamicDates = true,
-    this.showGregorianDates = true,
+    this.hijriDate,
   });
 
-  CalendarConfig copyWith({
-    Color? primaryColor,
-    Color? secondaryColor,
-    Color? backgroundColor,
-    Color? textColor,
-    Color? highlightColor,
-    bool? showIslamicDates,
-    bool? showGregorianDates,
-  }) {
-    return CalendarConfig(
-      primaryColor: primaryColor ?? this.primaryColor,
-      secondaryColor: secondaryColor ?? this.secondaryColor,
-      backgroundColor: backgroundColor ?? this.backgroundColor,
-      textColor: textColor ?? this.textColor,
-      highlightColor: highlightColor ?? this.highlightColor,
-      showIslamicDates: showIslamicDates ?? this.showIslamicDates,
-      showGregorianDates: showGregorianDates ?? this.showGregorianDates,
-    );
-  }
-}
-
-class IslamicDateConverter {
-  // Arabic numbers (0-9)
-  static const Map<int, String> arabicNumbers = {
-    0: '٠',
-    1: '١',
-    2: '٢',
-    3: '٣',
-    4: '٤',
-    5: '٥',
-    6: '٦',
-    7: '٧',
-    8: '٨',
-    9: '٩',
+  Map<String, dynamic> toJson() => {
+    'title': title,
+    'description': description,
+    'date': date.toIso8601String(),
+    // ignore: deprecated_member_use
+    'color': color.value,
+    'hijriDate': hijriDate,
   };
 
-  // Islamic months in Arabic
-  static const Map<int, String> islamicMonthsArabic = {
-    1: 'مُحَرَّم',
-    2: 'صَفَر',
-    3: 'رَبِيعُ ٱلْأَوَّل',
-    4: 'رَبِيعُ ٱلْآخِر',
-    5: 'جُمَادَىٰ ٱلْأُولَىٰ',
-    6: 'جُمَادَىٰ ٱلْآخِرَة',
-    7: 'رَجَب',
-    8: 'شَعْبَان',
-    9: 'رَمَضَان',
-    10: 'شَوَّال',
-    11: 'ذُو ٱلْقَعْدَة',
-    12: 'ذُو ٱلْحِجَّة',
-  };
-
-  // Convert number to Arabic numerals
-  static String toArabicNumbers(int number) {
-    return number.toString().split('').map((digit) {
-      return arabicNumbers[int.parse(digit)] ?? digit;
-    }).join();
-  }
-
-  // Accurate Hijri to Gregorian conversion
-  static Map<String, int> gregorianToHijri(DateTime gregorianDate) {
-    // Base reference: January 1, 2000 = 24 Ramadan 1420
-    final baseGregorian = DateTime(2000, 1, 1);
-    final baseHijriYear = 1420;
-    final baseHijriMonth = 9; // Ramadan
-    final baseHijriDay = 24;
-
-    // Days difference
-    final daysDiff = gregorianDate.difference(baseGregorian).inDays;
-
-    // Convert to Hijri days
-    // 1 Hijri year = 354.36707 days on average
-    final totalHijriDays =
-        (baseHijriYear * 354.36707 +
-        _hijriMonthsToDays(baseHijriMonth, baseHijriDay) +
-        daysDiff);
-
-    // Calculate year
-    int hijriYear = (totalHijriDays / 354.36707).floor();
-
-    // Calculate remaining days in the year
-    double remainingDays = totalHijriDays - (hijriYear * 354.36707);
-
-    // Month lengths (alternating 30 and 29)
-    final monthLengths = [30, 29, 30, 29, 30, 29, 30, 29, 30, 29, 30, 29];
-
-    int hijriMonth = 1;
-    int hijriDay = 1;
-
-    for (int i = 0; i < 12; i++) {
-      if (remainingDays <= monthLengths[i]) {
-        hijriMonth = i + 1;
-        hijriDay = remainingDays.round();
-        if (hijriDay < 1) hijriDay = 1;
-        if (hijriDay > monthLengths[i]) hijriDay = monthLengths[i];
-        break;
-      }
-      remainingDays -= monthLengths[i];
-    }
-
-    return {'year': hijriYear, 'month': hijriMonth, 'day': hijriDay};
-  }
-
-  static double _hijriMonthsToDays(int month, int day) {
-    final monthLengths = [30, 29, 30, 29, 30, 29, 30, 29, 30, 29, 30, 29];
-    double days = day.toDouble();
-    for (int i = 0; i < month - 1; i++) {
-      days += monthLengths[i];
-    }
-    return days;
-  }
-
-  // Convert Hijri to Gregorian - Simple and reliable method
-  static DateTime hijriToGregorian(
-    int hijriYear,
-    int hijriMonth,
-    int hijriDay,
-  ) {
-    try {
-      // Base reference: 1 Muharram 1446 = July 7, 2024
-      final baseDate = DateTime(2024, 7, 7);
-      final baseHijriYear = 1446;
-
-      // Calculate year difference
-      final yearDiff = hijriYear - baseHijriYear;
-
-      // Days from years (each Hijri year ≈ 354.36707 days)
-      double daysFromYears = yearDiff * 354.36707;
-
-      // Days from months in current year
-      final monthLengths = [30, 29, 30, 29, 30, 29, 30, 29, 30, 29, 30, 29];
-      double daysFromMonths = 0;
-      for (int i = 0; i < hijriMonth - 1; i++) {
-        daysFromMonths += monthLengths[i];
-      }
-
-      // Total days
-      double totalDays = daysFromYears + daysFromMonths + hijriDay - 1;
-
-      // Add to base date
-      return baseDate.add(Duration(days: totalDays.round()));
-    } catch (e) {
-      if (kDebugMode) {
-        print('❌ Error in hijriToGregorian: $e');
-      }
-      return DateTime.now();
-    }
-  }
-
-  static String getIslamicMonthNameArabic(int month) {
-    return islamicMonthsArabic[month] ?? 'غير معروف';
-  }
-
-  static String getFullHijriDateArabic(DateTime gregorianDate) {
-    final hijri = gregorianToHijri(gregorianDate);
-    final dayArabic = toArabicNumbers(hijri['day']!);
-    final monthArabic = getIslamicMonthNameArabic(hijri['month']!);
-    final yearArabic = toArabicNumbers(hijri['year']!);
-
-    return '$dayArabic $monthArabic $yearArabic هـ';
-  }
-
-  static String getHijriDayArabic(DateTime gregorianDate) {
-    final hijri = gregorianToHijri(gregorianDate);
-    return toArabicNumbers(hijri['day']!);
-  }
+  factory CalendarEvent.fromJson(Map<String, dynamic> json) => CalendarEvent(
+    title: json['title'],
+    description: json['description'],
+    date: DateTime.parse(json['date']),
+    color: Color(json['color']),
+    hijriDate: json['hijriDate'],
+  );
 }
 
 class CalendarScreen extends StatefulWidget {
@@ -216,639 +48,678 @@ class CalendarScreen extends StatefulWidget {
 }
 
 class _CalendarScreenState extends State<CalendarScreen> {
-  late CalendarFormat _calendarFormat;
   late DateTime _focusedDay;
   DateTime? _selectedDay;
   late Map<DateTime, List<CalendarEvent>> _events;
-  late CalendarConfig _config;
+  CalendarFormat _calendarFormat = CalendarFormat.month;
+  bool _isLoading = false;
+
+  final Color primaryColor = const Color(0xFF6B8F7F);
+  final Color backgroundColor = const Color(0xFFD9D9D9);
+
+  static const Map<String, String> arabicNumbers = {
+    '0': '٠', '1': '١', '2': '٢', '3': '٣', '4': '٤',
+    '5': '٥', '6': '٦', '7': '٧', '8': '٨', '9': '٩',
+  };
 
   @override
   void initState() {
     super.initState();
     _focusedDay = DateTime.now();
     _selectedDay = DateTime.now();
-    _calendarFormat = CalendarFormat.month;
-    _config = const CalendarConfig();
     _events = {};
     _loadEvents();
   }
 
-  void _loadEvents() {
-    // Load events for current year and adjacent years
-    final currentYear = _focusedDay.year;
-    final events = [
-      ..._getAllIslamicEvents(currentYear - 1),
-      ..._getAllIslamicEvents(currentYear),
-      ..._getAllIslamicEvents(currentYear + 1),
-    ];
-
-    _events = {};
-
-    for (final event in events) {
-      final day = DateTime(event.date.year, event.date.month, event.date.day);
-      _events[day] = [..._events[day] ?? [], event];
-    }
-
-    if (kDebugMode) {
-      print('📅 Loaded ${events.length} Islamic events');
-      for (var event in events.take(5)) {
-        print('  ${event.title}: ${event.date}');
-      }
-    }
+  String _toArabicNumbers(String number) {
+    String result = number;
+    arabicNumbers.forEach((english, arabic) {
+      result = result.replaceAll(english, arabic);
+    });
+    return result;
   }
 
-  List<CalendarEvent> _getAllIslamicEvents(int year) {
-    final List<CalendarEvent> events = [];
-
-    // Major Islamic Festivals with Arabic names
-    _addIslamicEvent(
-      events,
-      year,
-      1,
-      1,
-      "رأس السنة الهجرية",
-      "بداية شهر محرّم",
-      Colors.blue.shade100,
-    );
-
-    _addIslamicEvent(
-      events,
-      year,
-      1,
-      10,
-      "عاشوراء",
-      "يوم عاشوراء",
-      Colors.red.shade100,
-    );
-
-    _addIslamicEvent(
-      events,
-      year,
-      3,
-      12,
-      "المولد النبوي",
-      "مولد النبي محمد ﷺ",
-      Colors.green.shade100,
-    );
-
-    _addIslamicEvent(
-      events,
-      year,
-      7,
-      27,
-      "ليلة الإسراء والمعراج",
-      "رحلة الإسراء والمعراج",
-      Colors.purple.shade100,
-    );
-
-    _addIslamicEvent(
-      events,
-      year,
-      8,
-      15,
-      "ليلة النصف من شعبان",
-      "ليلة البراءة",
-      Colors.indigo.shade100,
-    );
-
-    _addIslamicEvent(
-      events,
-      year,
-      9,
-      1,
-      "بداية رمضان",
-      "أول أيام شهر رمضان المبارك",
-      Colors.teal.shade100,
-    );
-
-    _addIslamicEvent(
-      events,
-      year,
-      9,
-      27,
-      "ليلة القدر",
-      "ليلة خير من ألف شهر",
-      Colors.deepPurple.shade100,
-    );
-
-    _addIslamicEvent(
-      events,
-      year,
-      10,
-      1,
-      "عيد الفطر",
-      "العيد الصغير",
-      Colors.orange.shade100,
-    );
-
-    _addIslamicEvent(
-      events,
-      year,
-      12,
-      9,
-      "يوم عرفة",
-      "وقوف الحجاج على جبل عرفة",
-      Colors.brown.shade100,
-    );
-
-    _addIslamicEvent(
-      events,
-      year,
-      12,
-      10,
-      "عيد الأضحى",
-      "العيد الكبير",
-      Colors.deepOrange.shade100,
-    );
-
-    _addIslamicEvent(
-      events,
-      year,
-      12,
-      11,
-      "أيام التشريق",
-      "أيام الذبح",
-      Colors.orange.shade200,
-    );
-
-    _addIslamicEvent(
-      events,
-      year,
-      12,
-      12,
-      "أيام التشريق",
-      "أيام الذبح",
-      Colors.orange.shade200,
-    );
-
-    _addIslamicEvent(
-      events,
-      year,
-      12,
-      13,
-      "أيام التشريق",
-      "أيام الذبح",
-      Colors.orange.shade200,
-    );
-
-    return events;
-  }
-
-  void _addIslamicEvent(
-    List<CalendarEvent> events,
-    int gregorianYear,
-    int hijriMonth,
-    int hijriDay,
-    String title,
-    String desc,
-    Color color,
-  ) {
+  Future<void> _loadEvents() async {
+    setState(() => _isLoading = true);
+    
     try {
-      // Get current Hijri year based on gregorian year
-      final currentDate = DateTime(gregorianYear, 6, 1); // Mid year
-      final currentHijri = IslamicDateConverter.gregorianToHijri(currentDate);
-      final hijriYear = currentHijri['year']!;
+      await _loadCachedEvents();
+      
+      final prefs = await SharedPreferences.getInstance();
+      final lastUpdate = prefs.getString('last_calendar_update');
+      final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+      
+      if (lastUpdate == null || _shouldUpdate(lastUpdate)) {
+        await _fetchEventsFromAPI();
+        await prefs.setString('last_calendar_update', today);
+      }
+      
+    } catch (e) {
+      _loadDefaultEvents();
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
 
-      // Convert Hijri date to Gregorian for display
-      final gregorianDate = IslamicDateConverter.hijriToGregorian(
-        hijriYear,
-        hijriMonth,
-        hijriDay,
-      );
+  bool _shouldUpdate(String lastUpdateStr) {
+    try {
+      final lastUpdate = DateTime.parse(lastUpdateStr);
+      final daysDiff = DateTime.now().difference(lastUpdate).inDays;
+      return daysDiff >= 30;
+    } catch (e) {
+      return true;
+    }
+  }
 
-      // Only add if the date falls in the requested Gregorian year (±1 year tolerance)
-      if (gregorianDate.year >= gregorianYear - 1 &&
-          gregorianDate.year <= gregorianYear + 1) {
-        events.add(
-          CalendarEvent(
-            title: title,
-            description: desc,
-            date: gregorianDate,
-            color: color,
-            type: EventType.islamicFestival,
-          ),
-        );
-
-        if (kDebugMode) {
-          print(
-            '✅ Islamic Event: $title on $gregorianDate (${hijriDay}/$hijriMonth/$hijriYear هـ)',
+  Future<void> _fetchEventsFromAPI() async {
+    try {
+      
+      final currentYear = DateTime.now().year;
+      final nextYear = currentYear + 1;
+      
+      final events = <CalendarEvent>[];
+      
+      for (var year in [currentYear, nextYear]) {
+        final response = await http.get(
+          Uri.parse('https://api.aladhan.com/v1/gToHCalendar/$year'),
+        ).timeout(const Duration(seconds: 10));
+        
+        if (response.statusCode == 200) {
+          final data = json.decode(response.body);
+          
+          if (data['data'] != null) {
+            _processAPIData(data['data'], events, year);
+          }
+        }
+      }
+      
+      if (events.isNotEmpty) {
+        await _saveEventsToCache(events);
+        
+        _organizeEvents(events);
+        
+        debugPrint('✅ تم جلب ${events.length} حدث من الإنترنت');
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('✅ تم تحديث التقويم بنجاح'),
+              duration: Duration(seconds: 2),
+            ),
           );
         }
       }
+      
     } catch (e) {
-      if (kDebugMode) {
-        print('❌ Error adding Islamic event $title: $e');
+      debugPrint('❌ خطأ في جلب البيانات من API: $e');
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('⚠️ فشل التحديث، سيتم استخدام البيانات المحفوظة'),
+            duration: Duration(seconds: 3),
+          ),
+        );
       }
     }
+  }
+
+  void _processAPIData(List<dynamic> data, List<CalendarEvent> events, int year) {
+    // البحث عن المناسبات الإسلامية المهمة
+    final importantEvents = {
+      '1-1': {'title': 'رأس السنة الهجرية', 'color': Colors.blue.shade300},
+      '1-10': {'title': 'يوم عاشوراء', 'color': Colors.red.shade300},
+      '3-12': {'title': 'المولد النبوي الشريف', 'color': Colors.green.shade300},
+      '7-27': {'title': 'ليلة الإسراء والمعراج', 'color': Colors.purple.shade300},
+      '8-15': {'title': 'ليلة النصف من شعبان', 'color': Colors.indigo.shade300},
+      '9-1': {'title': 'أول رمضان', 'color': Colors.teal.shade400},
+      '9-27': {'title': 'ليلة القدر', 'color': Colors.deepPurple.shade600},
+      '10-1': {'title': 'عيد الفطر المبارك', 'color': Colors.amber.shade400},
+      '12-9': {'title': 'يوم عرفة', 'color': Colors.orange.shade500},
+      '12-10': {'title': 'عيد الأضحى المبارك', 'color': Colors.deepOrange.shade400},
+    };
+
+    for (var monthData in data) {
+      if (monthData is List) {
+        for (var dayData in monthData) {
+          try {
+            final gregorian = dayData['gregorian'];
+            final hijri = dayData['hijri'];
+            
+            if (gregorian != null && hijri != null) {
+              final date = DateFormat('dd-MM-yyyy').parse(gregorian['date']);
+              final hijriKey = '${hijri['month']['number']}-${hijri['day']}';
+              
+              if (importantEvents.containsKey(hijriKey)) {
+                final eventInfo = importantEvents[hijriKey]!;
+                
+                events.add(CalendarEvent(
+                  title: eventInfo['title'] as String,
+                  description: '${hijri['day']} ${hijri['month']['ar']} ${hijri['year']} هـ',
+                  date: date,
+                  color: eventInfo['color'] as Color,
+                  hijriDate: '${hijri['day']}-${hijri['month']['number']}-${hijri['year']}',
+                ));
+              }
+            }
+          } catch (e) {
+            debugPrint('خطأ في معالجة يوم: $e');
+          }
+        }
+      }
+    }
+  }
+
+  Future<void> _saveEventsToCache(List<CalendarEvent> events) async {
+    final prefs = await SharedPreferences.getInstance();
+    final eventsJson = events.map((e) => e.toJson()).toList();
+    await prefs.setString('cached_events', json.encode(eventsJson));
+    debugPrint('💾 تم حفظ ${events.length} حدث في الكاش');
+  }
+
+  Future<void> _loadCachedEvents() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cachedData = prefs.getString('cached_events');
+      
+      if (cachedData != null) {
+        final List<dynamic> eventsJson = json.decode(cachedData);
+        final events = eventsJson.map((e) => CalendarEvent.fromJson(e)).toList();
+        
+        _organizeEvents(events);
+        
+        debugPrint('📦 تم تحميل ${events.length} حدث من الكاش');
+      } else {
+        _loadDefaultEvents();
+      }
+    } catch (e) {
+      debugPrint('❌ خطأ في تحميل الكاش: $e');
+      _loadDefaultEvents();
+    }
+  }
+
+  void _organizeEvents(List<CalendarEvent> events) {
+    _events.clear();
+    
+    for (var event in events) {
+      final normalizedDate = DateTime(
+        event.date.year,
+        event.date.month,
+        event.date.day,
+      );
+      
+      if (_events[normalizedDate] == null) {
+        _events[normalizedDate] = [];
+      }
+      _events[normalizedDate]!.add(event);
+    }
+    
+    if (mounted) setState(() {});
+  }
+
+  void _loadDefaultEvents() {
+    debugPrint('📌 استخدام البيانات الأساسية...');
+    
+    final currentHijri = HijriCalendar.now();
+    final currentYear = currentHijri.hYear;
+    
+    _addYearEvents(currentYear);
+    _addYearEvents(currentYear + 1);
+    _addYearEvents(currentYear - 1);
+  }
+
+  void _addYearEvents(int hijriYear) {
+    final List<Map<String, dynamic>> islamicEvents = [
+      {'month': 1, 'day': 1, 'title': 'رأس السنة الهجرية', 'desc': 'بداية العام الهجري $hijriYear', 'color': Colors.blue.shade300},
+      {'month': 1, 'day': 10, 'title': 'يوم عاشوراء', 'desc': 'اليوم الذي نجى الله فيه موسى عليه السلام', 'color': Colors.red.shade300},
+      {'month': 3, 'day': 12, 'title': 'المولد النبوي الشريف', 'desc': 'مولد خير الأنام محمد ﷺ', 'color': Colors.green.shade300},
+      {'month': 7, 'day': 27, 'title': 'ليلة الإسراء والمعراج', 'desc': 'رحلة الإسراء والمعراج المباركة', 'color': Colors.purple.shade300},
+      {'month': 8, 'day': 15, 'title': 'ليلة النصف من شعبان', 'desc': 'ليلة البراءة المباركة', 'color': Colors.indigo.shade300},
+      {'month': 9, 'day': 1, 'title': 'أول رمضان', 'desc': 'بداية شهر رمضان المبارك', 'color': Colors.teal.shade400},
+      {'month': 9, 'day': 27, 'title': 'ليلة القدر', 'desc': 'ليلة خير من ألف شهر', 'color': Colors.deepPurple.shade600},
+      {'month': 10, 'day': 1, 'title': 'عيد الفطر المبارك', 'desc': 'العيد الصغير - أول أيام شوال', 'color': Colors.amber.shade400},
+      {'month': 12, 'day': 9, 'title': 'يوم عرفة', 'desc': 'أفضل أيام السنة - وقوف الحجاج بعرفة', 'color': Colors.orange.shade500},
+      {'month': 12, 'day': 10, 'title': 'عيد الأضحى المبارك', 'desc': 'العيد الكبير - يوم النحر', 'color': Colors.deepOrange.shade400},
+    ];
+
+    for (var eventData in islamicEvents) {
+      try {
+        final hijriDate = HijriCalendar();
+        hijriDate.hYear = hijriYear;
+        hijriDate.hMonth = eventData['month'] as int;
+        hijriDate.hDay = eventData['day'] as int;
+        
+        final gregorianDate = hijriDate.hijriToGregorian(
+          hijriDate.hYear,
+          hijriDate.hMonth,
+          hijriDate.hDay,
+        );
+        
+        final normalizedDate = DateTime(
+          gregorianDate.year,
+          gregorianDate.month,
+          gregorianDate.day,
+        );
+        
+        if (_events[normalizedDate] == null) {
+          _events[normalizedDate] = [];
+        }
+        
+        _events[normalizedDate]!.add(CalendarEvent(
+          title: eventData['title'] as String,
+          description: eventData['desc'] as String,
+          date: normalizedDate,
+          color: eventData['color'] as Color,
+          hijriDate: '${hijriDate.hDay}-${hijriDate.hMonth}-${hijriDate.hYear}',
+        ));
+        
+      } catch (e) {
+        debugPrint('❌ خطأ في إضافة حدث: ${eventData['title']} - $e');
+      }
+    }
+    
+    if (mounted) setState(() {});
   }
 
   List<CalendarEvent> _getEventsForDay(DateTime day) {
-    return _events[DateTime(day.year, day.month, day.day)] ?? [];
+    final normalizedDay = DateTime(day.year, day.month, day.day);
+    return _events[normalizedDay] ?? [];
   }
 
-  String _getHijriDate(DateTime date) {
-    return IslamicDateConverter.getFullHijriDateArabic(date);
-  }
+  static const Map<int, String> hijriMonthsArabic = {
+    1: 'مُحَرَّم',
+    2: 'صَفَر',
+    3: 'رَبِيع الأَوَّل',
+    4: 'رَبِيع الآخِر',
+    5: 'جُمَادَى الأُولَى',
+    6: 'جُمَادَى الآخِرَة',
+    7: 'رَجَب',
+    8: 'شَعْبَان',
+    9: 'رَمَضَان',
+    10: 'شَوَّال',
+    11: 'ذُو القَعْدَة',
+    12: 'ذُو الحِجَّة',
+  };
 
-  Widget _buildEventMarker(CalendarEvent event) {
-    Color markerColor = event.color;
+  static const Map<int, String> arabicDays = {
+    1: 'الاثنين',
+    2: 'الثلاثاء',
+    3: 'الأربعاء',
+    4: 'الخميس',
+    5: 'الجمعة',
+    6: 'السبت',
+    7: 'الأحد',
+  };
 
-    // Make markers more visible based on event type
-    if (event.type == EventType.islamicFestival) {
-      if (event.title.contains("عيد")) {
-        // Eid festivals - brighter colors
-        markerColor = Colors.yellow.shade700;
-      } else if (event.title.contains("رمضان")) {
-        // Ramadan - green
-        markerColor = Colors.green.shade700;
-      } else {
-        // Other Islamic events
-        markerColor = Colors.blue.shade700;
-      }
+  String _getHijriDateString(DateTime gregorianDate) {
+    try {
+      final hijri = HijriCalendar.fromDate(gregorianDate);
+      final dayArabic = _toArabicNumbers(hijri.hDay.toString());
+      final monthName = hijriMonthsArabic[hijri.hMonth] ?? hijri.getLongMonthName();
+      final yearArabic = _toArabicNumbers(hijri.hYear.toString());
+      
+      return '$dayArabic $monthName $yearArabic هـ';
+    } catch (e) {
+      debugPrint('خطأ في تحويل التاريخ: $e');
+      return '';
     }
-
-    return Container(
-      width: 8,
-      height: 8,
-      margin: const EdgeInsets.symmetric(horizontal: 1),
-      decoration: BoxDecoration(
-        color: markerColor,
-        shape: BoxShape.circle,
-        border: Border.all(color: Colors.white, width: 1),
-      ),
-    );
   }
 
-  Widget _buildEventList() {
-    final events = _selectedDay != null ? _getEventsForDay(_selectedDay!) : [];
-
-    if (events.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Text(
-          'لا توجد مناسبات لهذا اليوم',
-          style: TextStyle(
-            color: _config.textColor.withValues(alpha: .7),
-            fontSize: 16,
-          ),
-          textAlign: TextAlign.center,
-        ),
-      );
+  String _getGregorianDateArabic(DateTime date) {
+    try {
+      const monthsArabic = [
+        'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
+        'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'
+      ];
+      
+      final dayName = arabicDays[date.weekday] ?? DateFormat('EEEE', 'ar').format(date);
+      final day = _toArabicNumbers(date.day.toString());
+      final month = monthsArabic[date.month - 1];
+      final year = _toArabicNumbers(date.year.toString());
+      
+      return '$dayName، $day $month $year';
+    } catch (e) {
+      return _toArabicNumbers(DateFormat('EEEE، d MMMM yyyy', 'ar').format(date));
     }
-
-    return ListView.builder(
-      shrinkWrap: true,
-      itemCount: events.length,
-      itemBuilder: (context, index) {
-        final event = events[index];
-        return Card(
-          color: event.color.withValues(alpha: .3),
-          margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-          child: ListTile(
-            leading: Container(
-              width: 12,
-              height: 12,
-              decoration: BoxDecoration(
-                color: event.color,
-                shape: BoxShape.circle,
-              ),
-            ),
-            title: Text(
-              event.title,
-              style: TextStyle(
-                color: _config.textColor,
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-              ),
-              textDirection: TextDirection.rtl,
-            ),
-            subtitle: Text(
-              event.description,
-              style: TextStyle(
-                color: _config.textColor.withValues(alpha: .8),
-                fontSize: 14,
-              ),
-              textDirection: TextDirection.rtl,
-            ),
-          ),
-        );
-      },
-    );
   }
 
-  void _showSettings() {
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) {
-          return AlertDialog(
-            title: const Text('إعدادات التقويم'),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _buildColorSetting('لون الأساسي', _config.primaryColor, (
-                    color,
-                  ) {
-                    setDialogState(() {
-                      _config = _config.copyWith(primaryColor: color);
-                    });
-                  }),
-                  _buildColorSetting('لون الخلفية', _config.backgroundColor, (
-                    color,
-                  ) {
-                    setDialogState(() {
-                      _config = _config.copyWith(backgroundColor: color);
-                    });
-                  }),
-                  _buildColorSetting('لون النص', _config.textColor, (color) {
-                    setDialogState(() {
-                      _config = _config.copyWith(textColor: color);
-                    });
-                  }),
-                  _buildColorSetting('لون التمييز', _config.highlightColor, (
-                    color,
-                  ) {
-                    setDialogState(() {
-                      _config = _config.copyWith(highlightColor: color);
-                    });
-                  }),
-                  const SizedBox(height: 16),
-                  SwitchListTile(
-                    title: const Text('إظهار التواريخ الهجرية'),
-                    value: _config.showIslamicDates,
-                    onChanged: (value) {
-                      setDialogState(() {
-                        _config = _config.copyWith(showIslamicDates: value);
-                      });
-                    },
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('إلغاء'),
-              ),
-              TextButton(
-                onPressed: () {
-                  setState(() {});
-                  Navigator.pop(context);
-                },
-                child: const Text('تطبيق'),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildColorSetting(
-    String title,
-    Color color,
-    Function(Color) onChanged,
-  ) {
-    return ListTile(
-      title: Text(title),
-      trailing: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: color,
-          shape: BoxShape.circle,
-          border: Border.all(color: Colors.grey),
-        ),
-      ),
-      onTap: () => _showColorPicker(title, color, onChanged),
-    );
-  }
-
-  void _showColorPicker(
-    String title,
-    Color currentColor,
-    Function(Color) onColorChanged,
-  ) {
-    final colors = [
-      Colors.red,
-      Colors.pink,
-      Colors.purple,
-      Colors.deepPurple,
-      Colors.indigo,
-      Colors.blue,
-      Colors.lightBlue,
-      Colors.cyan,
-      Colors.teal,
-      Colors.green,
-      Colors.lightGreen,
-      Colors.lime,
-      Colors.yellow,
-      Colors.amber,
-      Colors.orange,
-      Colors.deepOrange,
-      Colors.brown,
-      Colors.grey,
-      Colors.blueGrey,
-      Colors.black,
-      Colors.white,
-    ];
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('اختر $title'),
-        content: Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: colors.map((color) {
-            return GestureDetector(
-              onTap: () {
-                onColorChanged(color);
-                Navigator.pop(context);
-              },
-              child: Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: color,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    // ignore: deprecated_member_use
-                    color: currentColor.value == color.value
-                        ? Colors.black
-                        : Colors.grey,
-                    width: 2,
-                  ),
-                ),
-              ),
-            );
-          }).toList(),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('إلغاء'),
-          ),
-        ],
-      ),
-    );
+  String _getShortHijriDay(DateTime gregorianDate) {
+    try {
+      final hijri = HijriCalendar.fromDate(gregorianDate);
+      return _toArabicNumbers(hijri.hDay.toString());
+    } catch (e) {
+      return '';
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _config.backgroundColor,
+      backgroundColor: backgroundColor,
       appBar: AppBar(
-        title: const Text('التقويم الهجري والميلادي'),
-        backgroundColor: _config.primaryColor,
+        title: const Text(
+          'التقويم الهجري',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        backgroundColor: primaryColor,
         foregroundColor: Colors.white,
+        elevation: 0,
         actions: [
+          // ✨ زر التحديث اليدوي
           IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: _showSettings,
+            icon: _isLoading 
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : const Icon(Icons.refresh),
+            onPressed: _isLoading ? null : () async {
+              await _fetchEventsFromAPI();
+            },
+            tooltip: 'تحديث التقويم',
           ),
         ],
       ),
       body: Column(
         children: [
           Card(
-            margin: const EdgeInsets.only(
-              top: 45,
-              left: 9,
-              right: 9,
-              bottom: 20,
-            ),
+            margin: const EdgeInsets.all(16),
             elevation: 4,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
             child: TableCalendar(
               firstDay: DateTime.utc(2020, 1, 1),
-              lastDay: DateTime.utc(2030, 12, 31),
+              lastDay: DateTime.utc(2035, 12, 31),
               focusedDay: _focusedDay,
               calendarFormat: _calendarFormat,
+              locale: 'ar',
               selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
+              
               onDaySelected: (selectedDay, focusedDay) {
                 setState(() {
                   _selectedDay = selectedDay;
                   _focusedDay = focusedDay;
                 });
               },
+              
               onFormatChanged: (format) {
                 setState(() {
                   _calendarFormat = format;
                 });
               },
+              
               onPageChanged: (focusedDay) {
                 setState(() {
                   _focusedDay = focusedDay;
                 });
-                _loadEvents();
               },
+              
               eventLoader: _getEventsForDay,
+              
               calendarStyle: CalendarStyle(
                 todayDecoration: BoxDecoration(
-                  color: _config.highlightColor.withValues(alpha: .7),
+                  color: primaryColor.withValues(alpha: .5),
                   shape: BoxShape.circle,
                 ),
+                todayTextStyle: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+                
                 selectedDecoration: BoxDecoration(
-                  color: _config.primaryColor,
+                  color: primaryColor,
                   shape: BoxShape.circle,
                 ),
-                markerDecoration: BoxDecoration(
-                  color: _config.secondaryColor,
-                  shape: BoxShape.circle,
+                selectedTextStyle: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
                 ),
+                
+                defaultTextStyle: const TextStyle(
+                  fontWeight: FontWeight.w500,
+                ),
+                
                 outsideDaysVisible: false,
-                markersAlignment: Alignment.bottomLeft,
+                
                 markersMaxCount: 3,
+                markerDecoration: const BoxDecoration(
+                  // color: const Color.fromARGB(255, 0, 0, 0),
+                  shape: BoxShape.circle,
+                ),
+                markersAlignment: Alignment.bottomCenter,
+                markerMargin: const EdgeInsets.symmetric(horizontal: 1),
               ),
+              
               headerStyle: HeaderStyle(
-                titleTextStyle: TextStyle(
-                  color: _config.textColor,
+                titleCentered: true,
+                formatButtonVisible: true,
+                titleTextStyle: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                 ),
-                formatButtonVisible: true,
-                formatButtonShowsNext: false,
                 formatButtonDecoration: BoxDecoration(
-                  color: _config.primaryColor,
+                  color: primaryColor,
                   borderRadius: BorderRadius.circular(20),
                 ),
-                formatButtonTextStyle: const TextStyle(color: Colors.white),
-                leftChevronIcon: Icon(
-                  Icons.chevron_left,
-                  color: _config.primaryColor,
+                formatButtonTextStyle: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
                 ),
-                rightChevronIcon: Icon(
-                  Icons.chevron_right,
-                  color: _config.primaryColor,
+                leftChevronIcon: Icon(Icons.chevron_left, color: primaryColor),
+                rightChevronIcon: Icon(Icons.chevron_right, color: primaryColor),
+              ),
+              
+              daysOfWeekStyle: const DaysOfWeekStyle(
+                weekdayStyle: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Color.fromARGB(221, 0, 0, 0),
+                ),
+                weekendStyle: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black,
                 ),
               ),
-              daysOfWeekStyle: DaysOfWeekStyle(
-                weekdayStyle: TextStyle(color: _config.textColor),
-                weekendStyle: TextStyle(color: _config.primaryColor),
-              ),
+              
               calendarBuilders: CalendarBuilders(
                 defaultBuilder: (context, day, focusedDay) {
                   final events = _getEventsForDay(day);
-                  return Stack(
-                    children: [
-                      Center(
-                        child: Text(
-                          '${day.day}',
-                          style: TextStyle(
-                            color: _config.textColor,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                      if (_config.showIslamicDates)
-                        Positioned(
-                          bottom: 2,
-                          right: 2,
+                  final hijriDay = _getShortHijriDay(day);
+                  
+                  return Container(
+                    margin: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: events.isNotEmpty 
+                          ? events.first.color.withValues(alpha: .2)
+                          : null,
+                    ),
+                    child: Stack(
+                      children: [
+                        Center(
                           child: Text(
-                            IslamicDateConverter.getHijriDayArabic(day),
-                            style: TextStyle(
-                              color: _config.textColor.withValues(alpha: .7),
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
+                            _toArabicNumbers(day.day.toString()),
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black87,
                             ),
                           ),
                         ),
-                      if (events.isNotEmpty)
-                        Positioned(
-                          bottom: 2,
-                          left: 2,
-                          child: Row(
-                            children: events
-                                .take(2)
-                                .map((event) => _buildEventMarker(event))
-                                .toList(),
+                        
+                        if (hijriDay.isNotEmpty)
+                          Positioned(
+                            bottom: 2,
+                            right: 2,
+                            child: Text(
+                              hijriDay,
+                              style: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                                color: primaryColor,
+                              ),
+                            ),
                           ),
-                        ),
-                    ],
+                        
+                        if (events.isNotEmpty)
+                          Positioned(
+                            bottom: 4,
+                            left: 4,
+                            child: Container(
+                              width: 6,
+                              height: 6,
+                              decoration: BoxDecoration(
+                                color: events.first.color,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
                   );
                 },
               ),
             ),
           ),
+          
           if (_selectedDay != null) ...[
             Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Text(
-                _getHijriDate(_selectedDay!),
-                style: TextStyle(
-                  color: _config.textColor,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: primaryColor.withValues(alpha: .1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: primaryColor, width: 2),
                 ),
-                textAlign: TextAlign.center,
+                child: Column(
+                  children: [
+                    Text(
+                      _toArabicNumbers(
+                        DateFormat('EEEE، d MMMM yyyy', 'ar').format(_selectedDay!)
+                      ),
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _getHijriDateString(_selectedDay!),
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: primaryColor,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
               ),
             ),
-            const Divider(),
-            Expanded(child: _buildEventList()),
+            
+            Expanded(
+              child: _buildEventsList(),
+            ),
           ],
         ],
       ),
+    );
+  }
+
+  Widget _buildEventsList() {
+    if (_selectedDay == null) return const SizedBox.shrink();
+    
+    final events = _getEventsForDay(_selectedDay!);
+    
+    if (events.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.event_busy,
+              size: 64,
+              color: Colors.grey.shade400,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'لا توجد مناسبات إسلامية في هذا اليوم',
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.grey.shade600,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: events.length,
+      itemBuilder: (context, index) {
+        final event = events[index];
+        return Card(
+          margin: const EdgeInsets.only(bottom: 12),
+          elevation: 2,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: event.color, width: 2),
+          ),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              gradient: LinearGradient(
+                colors: [
+                  event.color.withValues(alpha: .1),
+                  event.color.withValues(alpha: .05),
+                ],
+                begin: Alignment.topRight,
+                end: Alignment.bottomLeft,
+              ),
+            ),
+            child: ListTile(
+              contentPadding: const EdgeInsets.all(16),
+              leading: Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  color: event.color,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.star,
+                  color: Colors.white,
+                  size: 28,
+                ),
+              ),
+              title: Text(
+                event.title,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              subtitle: Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  event.description,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    height: 1.5,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

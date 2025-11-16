@@ -318,7 +318,9 @@ class _QiblaScreenState extends State<QiblaScreen>
                 SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    'امسك الهاتف بشكل أفقي للحصول على دقة أفضل',
+                    ' تأكد من هز الهاتف لتحديد القبله بدقه,  '
+                    'امسك الهاتف بشكل أفقي للحصول على دقة أفضل'
+                    ,
                     style: TextStyle(fontSize: 12, color: Colors.white70),
                   ),
                 ),

@@ -14,14 +14,13 @@ class _AzkarSettingsScreenState extends State<AzkarSettingsScreen> {
   double _fontSize = 24.0;
   Color _cardColor = const Color.fromARGB(240, 230, 237, 205);
   
-  // الألوان المتاحة
   final List<Color> _availableColors = [
-    const Color.fromARGB(240, 230, 237, 205), // البيج الأصلي
-    const Color.fromARGB(240, 205, 230, 237), // أزرق فاتح
-    const Color.fromARGB(240, 237, 205, 230), // وردي فاتح
-    const Color.fromARGB(240, 205, 237, 205), // أخضر فاتح
-    const Color.fromARGB(240, 237, 230, 205), // أصفر فاتح
-    const Color.fromARGB(240, 225, 215, 235), // بنفسجي فاتح
+    const Color.fromARGB(240, 230, 237, 205),
+    const Color.fromARGB(240, 205, 230, 237),
+    const Color.fromARGB(240, 237, 205, 230),
+    const Color.fromARGB(240, 205, 237, 205),
+    const Color.fromARGB(240, 237, 230, 205),
+    const Color.fromARGB(240, 225, 215, 235),
   ];
 
   @override
@@ -87,19 +86,15 @@ class _AzkarSettingsScreenState extends State<AzkarSettingsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // معاينة الكارت
             _buildPreviewCard(),
             const SizedBox(height: 30),
             
-            // حجم الخط
             _buildFontSizeSection(),
             const SizedBox(height: 25),
             
-            // لون الكارت
             _buildColorSection(),
             const SizedBox(height: 30),
             
-            // زر استعادة الافتراضي
             _buildResetButton(),
           ],
         ),
@@ -107,7 +102,6 @@ class _AzkarSettingsScreenState extends State<AzkarSettingsScreen> {
     );
   }
 
-  // معاينة الكارت
   Widget _buildPreviewCard() {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -162,7 +156,6 @@ class _AzkarSettingsScreenState extends State<AzkarSettingsScreen> {
     );
   }
 
-  // قسم حجم الخط
   Widget _buildFontSizeSection() {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -235,7 +228,6 @@ class _AzkarSettingsScreenState extends State<AzkarSettingsScreen> {
     );
   }
 
-  // قسم الألوان
   Widget _buildColorSection() {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -312,7 +304,6 @@ class _AzkarSettingsScreenState extends State<AzkarSettingsScreen> {
     );
   }
 
-  // زر استعادة الافتراضي
   Widget _buildResetButton() {
     return ElevatedButton.icon(
       onPressed: _resetToDefault,

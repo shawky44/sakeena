@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:azkar_app/services/prayer_notification_service.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
@@ -40,12 +41,9 @@ class _HomeScreenState extends State<HomeScreen> {
   Timer? _clockTimer;
   Timer? _refreshPrayerTimer;
 
-  // لحفظ آخر موقع معروف
   double? _cachedLat;
   double? _cachedLon;
-  bool _isLoading = true;
-  
-  // لحفظ الدولة الحالية
+  bool _isLoading = false; // Changed to false by default
   String? _currentCountry;
 
   static const Map<String, String> prayerBackgrounds = {
@@ -61,8 +59,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _startClock();
-    _initPrayerLogic();
-    
+    _loadCachedDataAndRefresh();
     ZikrPopupNotification().start(intervalHours: 4);
   }
 
@@ -70,8 +67,122 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     _clockTimer?.cancel();
     _refreshPrayerTimer?.cancel();
-    ZikrPopupNotification().stop(); // إيقاف بوب اب الأذكار
+    ZikrPopupNotification().stop();
     super.dispose();
+  }
+
+  Future<void> _loadCachedDataAndRefresh() async {
+    try {
+      await _loadCachedPrayerData();
+      
+      _refreshPrayerDataInBackground();
+      
+    } catch (e) {
+      debugPrint('Error loading cached data: $e');
+      _initPrayerLogic();
+    }
+  }
+
+  Future<void> _loadCachedPrayerData() async {
+    final prefs = await SharedPreferences.getInstance();
+    
+    final cachedPrayerTimesJson = prefs.getString('cached_prayer_times');
+    final cachedNextPrayer = prefs.getString('cached_next_prayer');
+    final cachedNextPrayerTime = prefs.getString('cached_next_prayer_time');
+    final cachedLocation = prefs.getString('cached_location');
+    
+    if (cachedPrayerTimesJson != null && cachedNextPrayer != null) {
+      final Map<String, dynamic> decodedTimes = json.decode(cachedPrayerTimesJson);
+      
+      setState(() {
+        allPrayerTimes = Map<String, String>.from(decodedTimes);
+        nextPrayerName = cachedNextPrayer;
+        displayPrayerTime = prefs.getString('cached_next_prayer_display') ?? '--:--';
+        userLocation = cachedLocation ?? 'موقعك';
+        
+        if (cachedNextPrayerTime != null) {
+          nextPrayerTime = DateTime.tryParse(cachedNextPrayerTime);
+        }
+      });
+      
+      debugPrint('✅ Loaded cached prayer data instantly!');
+    }
+    
+    _cachedLat = prefs.getDouble('cached_lat');
+    _cachedLon = prefs.getDouble('cached_lon');
+    _currentCountry = prefs.getString('cached_country');
+  }
+
+  Future<void> _refreshPrayerDataInBackground() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final lastUpdate = prefs.getString('last_prayer_update');
+      final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+      
+      if (lastUpdate == today && _cachedLat != null && _cachedLon != null) {
+        await _calculateAndSetPrayer(_cachedLat!, _cachedLon!, _currentCountry);
+        debugPrint('✅ Prayer times are up to date, recalculated next prayer only');
+        return;
+      }
+      
+      final pos = await _determinePosition();
+      final country = await _getLocationName(pos);
+      _currentCountry = country;
+
+      await _saveCachedLocation(pos.latitude, pos.longitude, country);
+      _cachedLat = pos.latitude;
+      _cachedLon = pos.longitude;
+
+      await _calculateAndSetPrayer(pos.latitude, pos.longitude, country);
+      await _scheduleNotificationsWithPosition(pos.latitude, pos.longitude, country);
+      
+      await prefs.setString('last_prayer_update', today);
+
+      _refreshPrayerTimer = Timer.periodic(const Duration(minutes: 1), (_) async {
+        if (_cachedLat != null && _cachedLon != null) {
+          await _calculateAndSetPrayer(_cachedLat!, _cachedLon!, _currentCountry);
+        }
+      });
+
+      _scheduleDailyNotificationRefresh(pos.latitude, pos.longitude, country);
+      
+      debugPrint('✅ Prayer data refreshed in background');
+
+    } catch (e) {
+      debugPrint('Background refresh error: $e');
+      if (_cachedLat == null || _cachedLon == null) {
+        await _calculateAndSetPrayer(30.0444, 31.2357, 'Egypt');
+        await _scheduleNotificationsWithPosition(30.0444, 31.2357, 'Egypt');
+      }
+    }
+  }
+
+  Future<void> _initPrayerLogic() async {
+    try {
+      final pos = await _determinePosition();
+      final country = await _getLocationName(pos);
+      _currentCountry = country;
+
+      await _saveCachedLocation(pos.latitude, pos.longitude, country);
+      _cachedLat = pos.latitude;
+      _cachedLon = pos.longitude;
+
+      await _calculateAndSetPrayer(pos.latitude, pos.longitude, country);
+      await _scheduleNotificationsWithPosition(pos.latitude, pos.longitude, country);
+
+      _refreshPrayerTimer = Timer.periodic(const Duration(minutes: 1), (_) async {
+        if (_cachedLat != null && _cachedLon != null) {
+          await _calculateAndSetPrayer(_cachedLat!, _cachedLon!, _currentCountry);
+        }
+      });
+
+      _scheduleDailyNotificationRefresh(pos.latitude, pos.longitude, country);
+
+    } catch (e) {
+      debugPrint('Prayer init error: $e');
+      await _calculateAndSetPrayer(30.0444, 31.2357, 'Egypt');
+      await _scheduleNotificationsWithPosition(30.0444, 31.2357, 'Egypt');
+    }
   }
 
   void _startClock() {
@@ -99,39 +210,6 @@ class _HomeScreenState extends State<HomeScreen> {
     if (mounted) setState(() {});
   }
 
-  Future<void> _initPrayerLogic() async {
-    try {
-
-      final pos = await _determinePosition();
-      
-      final country = await _getLocationName(pos);
-      _currentCountry = country;
-      
-      await _saveCachedLocation(pos.latitude, pos.longitude, country);
-      _cachedLat = pos.latitude;
-      _cachedLon = pos.longitude;
-      
-      await _calculateAndSetPrayer(pos.latitude, pos.longitude, country);
-      await _scheduleNotificationsWithPosition(pos.latitude, pos.longitude, country);
-
-      _refreshPrayerTimer = Timer.periodic(const Duration(minutes: 1), (_) async {
-        if (_cachedLat != null && _cachedLon != null) {
-          await _calculateAndSetPrayer(_cachedLat!, _cachedLon!, _currentCountry);
-        }
-      });
-
-      _scheduleDailyNotificationRefresh(pos.latitude, pos.longitude, country);
-      
-    } catch (e) {
-      debugPrint('Prayer init error: $e');
-      // استخدام القاهرة كموقع افتراضي
-      await _calculateAndSetPrayer(30.0444, 31.2357, 'Egypt');
-      await _scheduleNotificationsWithPosition(30.0444, 31.2357, 'Egypt');
-      setState(() => _isLoading = false);
-    }
-  }
-
-  // حفظ الموقع مع الدولة
   Future<void> _saveCachedLocation(double lat, double lon, String? country) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setDouble('cached_lat', lat);
@@ -141,14 +219,27 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _savePrayerTimesToCache(
+    Map<String, String> prayerTimes,
+    String nextPrayer,
+    String nextPrayerDisplay,
+    DateTime? nextPrayerDateTime,
+  ) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('cached_prayer_times', json.encode(prayerTimes));
+    await prefs.setString('cached_next_prayer', nextPrayer);
+    await prefs.setString('cached_next_prayer_display', nextPrayerDisplay);
+    if (nextPrayerDateTime != null) {
+      await prefs.setString('cached_next_prayer_time', nextPrayerDateTime.toIso8601String());
+    }
+  }
 
   CalculationParameters _getCalculationMethod(double lat, double lon, String? country) {
     final countryLower = country?.toLowerCase() ?? '';
-    
+
     CalculationParameters params;
-    
-    // مصر والسودان وليبيا
-    if (countryLower.contains('egypt') || 
+
+    if (countryLower.contains('egypt') ||
         countryLower.contains('مصر') ||
         countryLower.contains('sudan') ||
         countryLower.contains('السودان') ||
@@ -157,9 +248,7 @@ class _HomeScreenState extends State<HomeScreen> {
       params = CalculationMethod.egyptian();
       debugPrint('🕌 Using Egyptian method for: $country');
     }
-    
-    // أمريكا الشمالية (ISNA)
-    else if (countryLower.contains('united states') || 
+    else if (countryLower.contains('united states') ||
              countryLower.contains('canada') ||
              countryLower.contains('أمريكا') ||
              countryLower.contains('كندا') ||
@@ -167,9 +256,7 @@ class _HomeScreenState extends State<HomeScreen> {
       params = CalculationMethod.northAmerica();
       debugPrint('🕌 Using North America (ISNA) method for: $country');
     }
-    
-    // الخليج العربي (أم القرى - السعودية)
-    else if (countryLower.contains('saudi') || 
+    else if (countryLower.contains('saudi') ||
              countryLower.contains('السعودية') ||
              countryLower.contains('kuwait') ||
              countryLower.contains('الكويت') ||
@@ -184,26 +271,20 @@ class _HomeScreenState extends State<HomeScreen> {
       params = CalculationMethod.ummAlQura();
       debugPrint('🕌 Using Umm Al-Qura method for: $country');
     }
-    
-    // تركيا
-    else if (countryLower.contains('turkey') || 
+    else if (countryLower.contains('turkey') ||
              countryLower.contains('تركيا') ||
              countryLower.contains('türkiye')) {
       params = CalculationMethod.turkiye();
       debugPrint('🕌 Using Turkey method for: $country');
     }
-    
-    // إيران والعراق (طهران)
-    else if (countryLower.contains('iran') || 
+    else if (countryLower.contains('iran') ||
              countryLower.contains('إيران') ||
              countryLower.contains('iraq') ||
              countryLower.contains('العراق')) {
       params = CalculationMethod.tehran();
       debugPrint('🕌 Using Tehran method for: $country');
     }
-    
-    // باكستان والهند وبنغلاديش (كراتشي)
-    else if (countryLower.contains('pakistan') || 
+    else if (countryLower.contains('pakistan') ||
              countryLower.contains('باكستان') ||
              countryLower.contains('india') ||
              countryLower.contains('الهند') ||
@@ -212,9 +293,7 @@ class _HomeScreenState extends State<HomeScreen> {
       params = CalculationMethod.karachi();
       debugPrint('🕌 Using Karachi method for: $country');
     }
-    
-    // ماليزيا وسنغافورة وإندونيسيا
-    else if (countryLower.contains('malaysia') || 
+    else if (countryLower.contains('malaysia') ||
              countryLower.contains('ماليزيا') ||
              countryLower.contains('singapore') ||
              countryLower.contains('سنغافورة') ||
@@ -225,9 +304,7 @@ class _HomeScreenState extends State<HomeScreen> {
       params = CalculationMethod.singapore();
       debugPrint('🕌 Using Singapore method for: $country');
     }
-    
-    // المغرب وتونس والجزائر وموريتانيا
-    else if (countryLower.contains('morocco') || 
+    else if (countryLower.contains('morocco') ||
              countryLower.contains('المغرب') ||
              countryLower.contains('tunisia') ||
              countryLower.contains('تونس') ||
@@ -238,9 +315,7 @@ class _HomeScreenState extends State<HomeScreen> {
       params = CalculationMethod.moonsightingCommittee();
       debugPrint('🕌 Using Moonsighting Committee method for: $country');
     }
-    
-    // الشام (سوريا، الأردن، فلسطين، لبنان)
-    else if (countryLower.contains('syria') || 
+    else if (countryLower.contains('syria') ||
              countryLower.contains('سوريا') ||
              countryLower.contains('jordan') ||
              countryLower.contains('الأردن') ||
@@ -251,20 +326,16 @@ class _HomeScreenState extends State<HomeScreen> {
       params = CalculationMethod.muslimWorldLeague();
       debugPrint('🕌 Using Muslim World League method for: $country');
     }
-    
-    // دول أوروبية
     else if (lat > 40 && lat < 70 && lon > -10 && lon < 40) {
       params = CalculationMethod.muslimWorldLeague();
       debugPrint('🕌 Using Muslim World League method for Europe: $country');
     }
-    
     else {
       params = CalculationMethod.muslimWorldLeague();
       debugPrint('🕌 Using default Muslim World League method for: $country');
     }
 
-    // الحنفي: تركيا، باكستان، الشام (افتراضي في معظم أوروبا)
-    if (countryLower.contains('egypt') || 
+    if (countryLower.contains('egypt') ||
         countryLower.contains('saudi') ||
         countryLower.contains('kuwait') ||
         countryLower.contains('emirates') ||
@@ -282,12 +353,12 @@ class _HomeScreenState extends State<HomeScreen> {
       params.madhab = Madhab.hanafi;
       debugPrint('📿 Using Hanafi madhab');
     }
-    
+
     if (lat.abs() > 48) {
       params.highLatitudeRule = HighLatitudeRule.middleOfTheNight;
       debugPrint('🌍 Applied high latitude rule for lat: $lat');
     }
-    
+
     return params;
   }
 
@@ -295,12 +366,12 @@ class _HomeScreenState extends State<HomeScreen> {
     final coordinates = Coordinates(lat, lon);
     final now = DateTime.now();
     final localDate = DateTime(now.year, now.month, now.day);
-    
+
     final params = _getCalculationMethod(lat, lon, country);
 
     final prayerTimes = PrayerTimes(
-      coordinates: coordinates, 
-      date: localDate, 
+      coordinates: coordinates,
+      date: localDate,
       calculationParameters: params
     );
 
@@ -333,8 +404,8 @@ class _HomeScreenState extends State<HomeScreen> {
     if (foundNextPrayerName == null || foundNextPrayerTime == null) {
       final tomorrow = DateTime(now.year, now.month, now.day + 1);
       final tomorrowPrayers = PrayerTimes(
-        coordinates: coordinates, 
-        date: tomorrow, 
+        coordinates: coordinates,
+        date: tomorrow,
         calculationParameters: params
       );
       foundNextPrayerName = 'الفجر';
@@ -349,9 +420,16 @@ class _HomeScreenState extends State<HomeScreen> {
       'العشاء': ishaTime != null ? DateFormat('h:mm a', 'en_US').format(ishaTime) : '--:--',
     };
 
-    final formattedNextTime = foundNextPrayerTime != null 
-        ? DateFormat('h:mm a', 'en_US').format(foundNextPrayerTime) 
+    final formattedNextTime = foundNextPrayerTime != null
+        ? DateFormat('h:mm a', 'en_US').format(foundNextPrayerTime)
         : '--:--';
+
+    await _savePrayerTimesToCache(
+      formattedPrayerTimes,
+      foundNextPrayerName ?? 'الصلاة',
+      formattedNextTime,
+      foundNextPrayerTime,
+    );
 
     if (mounted) {
       setState(() {
@@ -372,12 +450,11 @@ class _HomeScreenState extends State<HomeScreen> {
     final now = DateTime.now();
     final localDate = DateTime(now.year, now.month, now.day);
 
-    // ✅ استخدام نفس طريقة الحساب
     final params = _getCalculationMethod(lat, lon, country);
 
     final prayerTimes = PrayerTimes(
-      coordinates: coordinates, 
-      date: localDate, 
+      coordinates: coordinates,
+      date: localDate,
       calculationParameters: params
     );
 
@@ -416,7 +493,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return await Geolocator.getCurrentPosition(
       locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.high, 
+        accuracy: LocationAccuracy.high,
         distanceFilter: 0
       ),
     );
@@ -431,6 +508,9 @@ class _HomeScreenState extends State<HomeScreen> {
         if (mounted) {
           setState(() {
             userLocation = '${place.locality ?? place.subAdministrativeArea ?? 'موقعك'} - $country';
+          });
+          SharedPreferences.getInstance().then((prefs) {
+            prefs.setString('cached_location', userLocation);
           });
         }
         return country;
@@ -483,7 +563,7 @@ class _HomeScreenState extends State<HomeScreen> {
           Transform.translate(
             offset: const Offset(0, -30),
             child: MainContentSection(
-              allPrayerTimes: allPrayerTimes, 
+              allPrayerTimes: allPrayerTimes,
               nextPrayerName: nextPrayerName
             ),
           ),
@@ -495,15 +575,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildPrayerHeader() {
     final backgroundImage = prayerBackgrounds[nextPrayerName] ?? 'assets/images/bg_asr.jpg';
-    
-    // عرض مؤشر تحميل إذا كانت البيانات لا تزال تُحمل
+
     if (_isLoading && nextPrayerName == '...') {
       return Container(
         width: double.infinity,
         height: 270,
         decoration: BoxDecoration(
           image: DecorationImage(
-            image: AssetImage(backgroundImage), 
+            image: AssetImage(backgroundImage),
             fit: BoxFit.cover
           ),
         ),
@@ -518,7 +597,7 @@ class _HomeScreenState extends State<HomeScreen> {
       height: 270,
       decoration: BoxDecoration(
         image: DecorationImage(
-          image: AssetImage(backgroundImage), 
+          image: AssetImage(backgroundImage),
           fit: BoxFit.cover
         ),
       ),
@@ -528,8 +607,8 @@ class _HomeScreenState extends State<HomeScreen> {
           Text(
             'صلاة $nextPrayerName',
             style: const TextStyle(
-              color: Colors.white, 
-              fontSize: 36, 
+              color: Colors.white,
+              fontSize: 36,
               fontWeight: FontWeight.bold
             ),
           ),
@@ -537,8 +616,8 @@ class _HomeScreenState extends State<HomeScreen> {
           Text(
             displayPrayerTime,
             style: const TextStyle(
-              color: Colors.white, 
-              fontSize: 30, 
+              color: Colors.white,
+              fontSize: 30,
               fontWeight: FontWeight.bold
             ),
           ),
@@ -572,7 +651,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         child: ClipRRect(
           borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(20), 
+            topLeft: Radius.circular(20),
             topRight: Radius.circular(20)
           ),
           child: BottomNavigationBar(

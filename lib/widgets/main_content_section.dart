@@ -1,4 +1,3 @@
-//main content section
 import 'package:flutter/material.dart';
 
 class MainContentSection extends StatelessWidget {
@@ -14,20 +13,19 @@ class MainContentSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: double.infinity, // Infinite width
-      margin: EdgeInsets.zero, // No horizontal margins (infinite from sides)
+      width: double.infinity, 
+      margin: EdgeInsets.zero, 
       padding: const EdgeInsets.fromLTRB(
         16,
         40,
         16,
         30,
-      ), // Added bottom padding
+      ), 
       decoration: BoxDecoration(
         color: const Color.fromARGB(255, 188, 194, 193).withValues(alpha: 1),
         borderRadius: const BorderRadius.only(
           topLeft: Radius.circular(30),
           topRight: Radius.circular(30),
-          // No bottom radius - extends to bottom
         ),
         boxShadow: [
           BoxShadow(
@@ -39,7 +37,6 @@ class MainContentSection extends StatelessWidget {
       ),
       child: Column(
         children: [
-          //  Prayer Times Container added here
           _buildPrayerTimesContainer(),
           const SizedBox(height: 30),
           _buildDuaaCard(),
@@ -89,7 +86,6 @@ class MainContentSection extends StatelessWidget {
         ),
         child: LayoutBuilder(
           builder: (context, constraints) {
-            // تحديد الحجم بناءً على المساحة المتاحة
             final bool isSmall = constraints.maxWidth < 60;
             final double iconSize = isSmall ? 20 : 26;
             final double titleFontSize = isSmall ? 10 : 12;
@@ -198,7 +194,6 @@ class MainContentSection extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         child: Stack(
           children: [
-            // الخلفية
             Positioned.fill(
               child: Opacity(
                 opacity: 0.78,
@@ -209,7 +204,6 @@ class MainContentSection extends StatelessWidget {
               ),
             ),
 
-            // المحتوى
             Padding(
               padding: const EdgeInsets.all(8),
               child: Column(
@@ -228,7 +222,6 @@ class MainContentSection extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
-                      // الوصف
                       Expanded(
                         child: Container(
                           padding: const EdgeInsets.symmetric(
@@ -253,7 +246,6 @@ class MainContentSection extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 12),
-                      // الاسم في دائرة
                       Transform.translate(
                         offset: const Offset(0, -18),
                         child: Container(
@@ -296,7 +288,6 @@ class MainContentSection extends StatelessWidget {
     required String backgroundImage,
   }) {
     return Container(
-      // height: 150, // remove this
       width: double.infinity,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
@@ -314,7 +305,6 @@ class MainContentSection extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         child: Stack(
           children: [
-            // الخلفية
             Positioned.fill(
               child: Image.asset(
                 backgroundImage,
@@ -324,7 +314,6 @@ class MainContentSection extends StatelessWidget {
                 },
               ),
             ),
-            // المحتوى
             Padding(
               padding: const EdgeInsets.only(
                 top: 16,

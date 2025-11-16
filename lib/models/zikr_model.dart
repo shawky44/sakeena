@@ -1,4 +1,3 @@
-// موديل الذكر
 class Zikr {
   final String id;
   final String text;
@@ -6,6 +5,8 @@ class Zikr {
   final String? reference;
   int currentCount;
   bool isCompleted;
+  DateTime? lastResetDate;
+  int position;
 
   Zikr({
     required this.id,
@@ -14,6 +15,8 @@ class Zikr {
     this.reference,
     this.currentCount = 0,
     this.isCompleted = false,
+    this.lastResetDate,
+    this.position = 0,
   });
 
   Map<String, dynamic> toJson() {
@@ -24,6 +27,8 @@ class Zikr {
       'reference': reference,
       'currentCount': currentCount,
       'isCompleted': isCompleted,
+      'lastResetDate': lastResetDate?.toIso8601String(),
+      'position': position,
     };
   }
 
@@ -35,6 +40,10 @@ class Zikr {
       reference: json['reference'],
       currentCount: json['currentCount'] ?? 0,
       isCompleted: json['isCompleted'] ?? false,
+      lastResetDate: json['lastResetDate'] != null 
+          ? DateTime.parse(json['lastResetDate']) 
+          : null,
+      position: json['position'] ?? 0,
     );
   }
 
@@ -45,6 +54,8 @@ class Zikr {
     String? reference,
     int? currentCount,
     bool? isCompleted,
+    DateTime? lastResetDate,
+    int? position,
   }) {
     return Zikr(
       id: id ?? this.id,
@@ -53,12 +64,15 @@ class Zikr {
       reference: reference ?? this.reference,
       currentCount: currentCount ?? this.currentCount,
       isCompleted: isCompleted ?? this.isCompleted,
+      lastResetDate: lastResetDate ?? this.lastResetDate,
+      position: position ?? this.position,
     );
   }
 
   void reset() {
     currentCount = 0;
     isCompleted = false;
+    lastResetDate = DateTime.now();
   }
 
   void increment() {
@@ -67,6 +81,23 @@ class Zikr {
       if (currentCount == count) {
         isCompleted = true;
       }
+    }
+  }
+
+  bool needsDailyReset() {
+    if (lastResetDate == null) return false;
+    
+    final now = DateTime.now();
+    final lastReset = lastResetDate!;
+    
+    return now.year != lastReset.year ||
+           now.month != lastReset.month ||
+           now.day != lastReset.day;
+  }
+
+  void checkAndResetIfNeeded() {
+    if (needsDailyReset()) {
+      reset();
     }
   }
 }

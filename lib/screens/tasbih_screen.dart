@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:vibration/vibration.dart';
-import 'package:audioplayers/audioplayers.dart'; // ⬅️ أضف هذه المكتبة
+import 'package:audioplayers/audioplayers.dart';
 
 class TasbihScreen extends StatefulWidget {
   const TasbihScreen({super.key});
@@ -14,7 +14,7 @@ class _TasbihScreenState extends State<TasbihScreen> {
   int targetCount = 33;
   final TextEditingController _dhikrController = TextEditingController();
   String dhikrText = 'سبحان الله';
-  final AudioPlayer _audioPlayer = AudioPlayer(); // ⬅️ مشغل الصوت
+  final AudioPlayer _audioPlayer = AudioPlayer();
 
   @override
   void initState() {
@@ -22,9 +22,7 @@ class _TasbihScreenState extends State<TasbihScreen> {
     _initializeAudio();
   }
 
-  // تهيئة الصوت
   void _initializeAudio() async {
-    // يمكنك تغيير هذا الصوت إلى صوت السبحة الذي تريده
     await _audioPlayer.setSource(AssetSource('sounds/tasbih_sound.mp3'));
   }
 
@@ -34,12 +32,10 @@ class _TasbihScreenState extends State<TasbihScreen> {
         counter++;
       });
 
-      // ⬅️ تشغيل صوت السبحة
       await _playTasbihSound();
 
-      // ⬅️ إضافة الاهتزاز
       if (await Vibration.hasVibrator()) {
-        Vibration.vibrate(duration: 50); // اهتزاز قصير
+        Vibration.vibrate(duration: 50);
       }
     }
   }
@@ -47,8 +43,8 @@ class _TasbihScreenState extends State<TasbihScreen> {
   // تشغيل صوت السبحة
   Future<void> _playTasbihSound() async {
     try {
-      await _audioPlayer.seek(Duration.zero); // إعادة الصوت للبداية
-      await _audioPlayer.resume(); // تشغيل الصوت
+      await _audioPlayer.seek(Duration.zero);
+      await _audioPlayer.resume();
     } catch (e) {
       debugPrint('خطأ في تشغيل الصوت: $e');
     }
@@ -111,11 +107,10 @@ class _TasbihScreenState extends State<TasbihScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              // عداد الذكر
               Container(
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: .1), // ⬅️ تم التصحيح
+                  color: Colors.white.withValues(alpha: .1),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Column(
@@ -142,7 +137,6 @@ class _TasbihScreenState extends State<TasbihScreen> {
                 ),
               ),
 
-              // العداد الرئيسي
               GestureDetector(
                 onTap: _incrementCounter,
                 child: Container(
@@ -153,7 +147,7 @@ class _TasbihScreenState extends State<TasbihScreen> {
                     color: const Color.fromARGB(255, 187, 186, 186),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: .3), // ⬅️ تم التصحيح
+                        color: Colors.black.withValues(alpha: .3),
                         spreadRadius: 5,
                         blurRadius: 15,
                         offset: const Offset(0, 5),
@@ -185,7 +179,6 @@ class _TasbihScreenState extends State<TasbihScreen> {
                 ),
               ),
 
-              // أزرار اختيار العدد
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -195,7 +188,6 @@ class _TasbihScreenState extends State<TasbihScreen> {
                 ],
               ),
 
-              // زر إعادة التعيين
               SizedBox(
                 width: double.infinity,
                 height: 56,
@@ -233,7 +225,7 @@ class _TasbihScreenState extends State<TasbihScreen> {
       style: ElevatedButton.styleFrom(
         backgroundColor: isSelected
             ? const Color(0xFFD9D9D9)
-            : const Color(0xFFD9D9D9).withValues(alpha: .3), // ⬅️ تم التصحيح
+            : const Color(0xFFD9D9D9).withValues(alpha: .3), 
         foregroundColor: isSelected
             ? const Color(0xEB43635A)
             : const Color.fromARGB(134, 255, 255, 255),
@@ -250,7 +242,7 @@ class _TasbihScreenState extends State<TasbihScreen> {
   @override
   void dispose() {
     _dhikrController.dispose();
-    _audioPlayer.dispose(); // ⬅️ تحرير موارد الصوت
+    _audioPlayer.dispose();
     super.dispose();
   }
 }
