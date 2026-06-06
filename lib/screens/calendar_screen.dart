@@ -365,6 +365,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
     }
   }
 
+  // ignore: unused_element
   String _getGregorianDateArabic(DateTime date) {
     try {
       const monthsArabic = [

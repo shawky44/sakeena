@@ -1,17 +1,37 @@
-import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:android_alarm_manager_plus/android_alarm_manager_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+// ✅ دالة الأذكار اللي هتشتغل في الخلفية
+@pragma('vm:entry-point')
+void zikrAlarmCallback() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  debugPrint('🤲 Zikr alarm triggered at ${DateTime.now()}');
+
+  final service = ZikrPopupNotification();
+  await service.initialize();
+  await service.showNow();
+
+  // جدولة الذكر القادم
+  await service._scheduleNextZikr();
+}
 
 class ZikrPopupNotification {
-  static final ZikrPopupNotification _instance = ZikrPopupNotification._internal();
+  static final ZikrPopupNotification _instance =
+      ZikrPopupNotification._internal();
   factory ZikrPopupNotification() => _instance;
   ZikrPopupNotification._internal();
 
-  final FlutterLocalNotificationsPlugin _notifications = FlutterLocalNotificationsPlugin();
-  Timer? _timer;
+  final FlutterLocalNotificationsPlugin _notifications =
+      FlutterLocalNotificationsPlugin();
   bool _isInitialized = false;
-  int _notificationId = 2000; // Start from 2000 to avoid conflicts
+  int _notificationId = 2000;
+
+  static const int _zikrAlarmId = 8888;
+  static const String _zikrEnabledKey = 'zikr_notifications_enabled';
+  static const String _zikrIntervalKey = 'zikr_interval_hours';
 
   static const List<String> azkarList = [
     'سُبْحَانَ اللهِ وَبِحَمْدِهِ',
@@ -157,10 +177,8 @@ class ZikrPopupNotification {
     if (_isInitialized) return;
 
     try {
-      const androidSettings = AndroidInitializationSettings(
-        '@mipmap/ic_launcher',
-      );
-
+      const androidSettings =
+          AndroidInitializationSettings('@mipmap/ic_launcher');
       const iosSettings = DarwinInitializationSettings(
         requestAlertPermission: true,
         requestBadgePermission: false,
@@ -179,33 +197,75 @@ class ZikrPopupNotification {
         },
       );
 
+      await _createZikrChannel();
       _isInitialized = true;
       debugPrint('✅ Zikr popup notification initialized');
     } catch (e) {
-      debugPrint('Error initializing zikr notifications: $e');
+      debugPrint('❌ Error initializing zikr notifications: $e');
     }
   }
 
-  /// [intervalHours] -   
-  Future<void> start({int intervalHours = 3}) async {
+Future<void> _createZikrChannel() async {
+  final android = _notifications
+      .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+  
+  if (android == null) return;
+
+  await android.createNotificationChannel(
+    const AndroidNotificationChannel(
+      'zikr_popup_channel',
+      'أذكار منبثقة',
+      description: 'أذكار تظهر على الشاشة بشكل دوري',
+      importance: Importance.high,
+      playSound: true,
+      enableVibration: true,
+      enableLights: true,
+    ),
+  );
+  debugPrint('✅ Zikr channel created');
+}
+
+  // ✅ بدء الأذكار باستخدام AndroidAlarmManager
+  Future<void> start({int intervalHours = 4}) async {
     await initialize();
 
-    stop();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_zikrEnabledKey, true);
+    await prefs.setInt(_zikrIntervalKey, intervalHours);
 
-    debugPrint('🚀 Starting zikr popup every $intervalHours hours');
+    debugPrint(
+        '🚀 Starting zikr popup every $intervalHours hours using AlarmManager');
 
-    _timer = Timer.periodic(Duration(hours: intervalHours), (_) {
-      _showZikrPopup();
-    });
-
-    // عرض أول ذكر بعد دقيقة للاختبار
-    // Timer(const Duration(minutes: 1), _showZikrPopup);
+    await _scheduleNextZikr();
   }
 
-  /// إيقاف الأذكار
-  void stop() {
-    _timer?.cancel();
-    _timer = null;
+  // ✅ جدولة الذكر القادم
+  Future<void> _scheduleNextZikr() async {
+    final prefs = await SharedPreferences.getInstance();
+    final intervalHours = prefs.getInt(_zikrIntervalKey) ?? 4;
+
+    final nextZikrTime = DateTime.now().add(Duration(hours: intervalHours));
+
+    await AndroidAlarmManager.oneShotAt(
+      nextZikrTime,
+      _zikrAlarmId,
+      zikrAlarmCallback,
+      exact: true,
+      wakeup: true,
+      allowWhileIdle: true,
+      rescheduleOnReboot: true,
+    );
+
+    debugPrint('⏰ Next zikr scheduled for: $nextZikrTime');
+  }
+
+  // ✅ إيقاف الأذكار
+  Future<void> stop() async {
+    await AndroidAlarmManager.cancel(_zikrAlarmId);
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_zikrEnabledKey, false);
+
     debugPrint('⛔ Zikr popup stopped');
   }
 
@@ -226,29 +286,25 @@ class ZikrPopupNotification {
           android: AndroidNotificationDetails(
             'zikr_popup_channel',
             'أذكار منبثقة',
-            channelDescription: 'أذكار تظهر على الشاشة',
+            channelDescription: 'أذكار تظهر على الشاشة بشكل دوري',
             importance: Importance.high,
             priority: Priority.high,
-            
-
-            
             styleInformation: BigTextStyleInformation(
               zikr,
               htmlFormatBigText: false,
               contentTitle: '🤲 اذكر الله يذكرك',
               htmlFormatContentTitle: false,
             ),
-
             color: const Color(0xFF6B8F7F),
-
             playSound: true,
             enableVibration: true,
             enableLights: true,
             ledColor: const Color(0xFF6B8F7F),
             ledOnMs: 1000,
             ledOffMs: 500,
-
             icon: '@mipmap/ic_launcher',
+            autoCancel: true,
+            fullScreenIntent: true,
           ),
           iOS: const DarwinNotificationDetails(
             presentAlert: true,
@@ -259,9 +315,9 @@ class ZikrPopupNotification {
         ),
       );
 
-      debugPrint('💬 Zikr popup shown: $zikr');
+      debugPrint('💬 Zikr popup shown: $zikr (ID: $_notificationId)');
     } catch (e) {
-      debugPrint('Error showing zikr popup: $e');
+      debugPrint('❌ Error showing zikr popup: $e');
     }
   }
 
@@ -271,7 +327,14 @@ class ZikrPopupNotification {
   }
 
   Future<void> cancelAll() async {
+    await stop();
     await _notifications.cancelAll();
-    debugPrint('All zikr notifications cancelled');
+    debugPrint('🗑️ All zikr notifications cancelled');
+  }
+
+  // ✅ التحقق من حالة الأذكار
+  Future<bool> isEnabled() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_zikrEnabledKey) ?? false;
   }
 }

@@ -1,3 +1,7 @@
+// lib/models/zikr_model.dart (تحديث)
+
+import 'package:flutter/material.dart';
+
 class Zikr {
   final String id;
   final String text;
@@ -8,6 +12,9 @@ class Zikr {
   DateTime? lastResetDate;
   int position;
 
+  // NEW: Callback للتحديث
+  VoidCallback? onProgressChanged;
+
   Zikr({
     required this.id,
     required this.text,
@@ -17,6 +24,7 @@ class Zikr {
     this.isCompleted = false,
     this.lastResetDate,
     this.position = 0,
+    this.onProgressChanged,
   });
 
   Map<String, dynamic> toJson() {
@@ -56,6 +64,7 @@ class Zikr {
     bool? isCompleted,
     DateTime? lastResetDate,
     int? position,
+    VoidCallback? onProgressChanged,
   }) {
     return Zikr(
       id: id ?? this.id,
@@ -66,6 +75,7 @@ class Zikr {
       isCompleted: isCompleted ?? this.isCompleted,
       lastResetDate: lastResetDate ?? this.lastResetDate,
       position: position ?? this.position,
+      onProgressChanged: onProgressChanged ?? this.onProgressChanged,
     );
   }
 
@@ -73,6 +83,7 @@ class Zikr {
     currentCount = 0;
     isCompleted = false;
     lastResetDate = DateTime.now();
+    onProgressChanged?.call(); 
   }
 
   void increment() {
@@ -81,6 +92,7 @@ class Zikr {
       if (currentCount == count) {
         isCompleted = true;
       }
+      onProgressChanged?.call(); 
     }
   }
 

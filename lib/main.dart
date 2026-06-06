@@ -1,5 +1,7 @@
+import 'package:android_alarm_manager_plus/android_alarm_manager_plus.dart';
 import 'package:azkar_app/screens/home_screen.dart';
 import 'package:azkar_app/screens/splash_screen.dart';
+import 'package:azkar_app/services/background_service.dart';
 import 'package:azkar_app/services/prayer_notification_service.dart';
 import 'package:azkar_app/services/zikr_popup_notification.dart';
 import 'package:device_preview/device_preview.dart';
@@ -8,15 +10,21 @@ import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
   await initializeDateFormatting('ar', null);
   await initializeDateFormatting('en_US', null);
   
+  await AndroidAlarmManager.initialize();
+
   await PrayerNotificationService().ensureInitialized();
   await ZikrPopupNotification().initialize();
-  ZikrPopupNotification().start(intervalHours: 4);
+
+  final backgroundService = PrayerBackgroundService();
+  await backgroundService.scheduleNextDayRefresh();
+  
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
@@ -45,10 +53,12 @@ class AzkArpp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+
       // ignore: deprecated_member_use
       useInheritedMediaQuery: true,
       locale: DevicePreview.locale(context),
       builder: DevicePreview.appBuilder,
+
       debugShowCheckedModeBanner: false,
       title: 'Sakeena',
       

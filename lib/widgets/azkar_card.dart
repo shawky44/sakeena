@@ -1,15 +1,24 @@
+// lib/widgets/azkar_card.dart
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:vibration/vibration.dart';
 import '../models/zikr_model.dart';
-import '../services/azkar_settings_service.dart';
 
 class AzkarCard extends StatefulWidget {
   final Zikr zikr;
   final VoidCallback? onCountChanged;
 
-  const AzkarCard({super.key, required this.zikr, this.onCountChanged});
+  final double fontSize;
+  final Color cardColor;
+
+  const AzkarCard({
+    super.key,
+    required this.zikr,
+    required this.fontSize,
+    required this.cardColor,
+    this.onCountChanged,
+  });
 
   @override
   State<AzkarCard> createState() => _AzkarCardState();
@@ -17,32 +26,9 @@ class AzkarCard extends StatefulWidget {
 
 class _AzkarCardState extends State<AzkarCard>
     with AutomaticKeepAliveClientMixin {
-  final AzkarSettingsService _settingsService = AzkarSettingsService();
-
-  double _fontSize = 24.0;
-  Color _cardColor = const Color.fromARGB(240, 230, 237, 205);
-  bool _isLoading = true;
 
   @override
   bool get wantKeepAlive => true;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadSettings();
-  }
-
-  Future<void> _loadSettings() async {
-    final fontSize = await _settingsService.getFontSize();
-    final cardColor = await _settingsService.getCardColor();
-    if (mounted) {
-      setState(() {
-        _fontSize = fontSize;
-        _cardColor = cardColor;
-        _isLoading = false;
-      });
-    }
-  }
 
   void _incrementCount() {
     if (widget.zikr.currentCount < widget.zikr.count) {
@@ -50,12 +36,8 @@ class _AzkarCardState extends State<AzkarCard>
         widget.zikr.increment();
       });
       Vibration.vibrate(duration: 50);
-      if (widget.zikr.isCompleted) {
-        HapticFeedback.mediumImpact();
-        widget.onCountChanged?.call();
-      } else {
-        widget.onCountChanged?.call();
-      }
+      HapticFeedback.lightImpact();
+      widget.onCountChanged?.call();
     }
   }
 
@@ -89,30 +71,12 @@ class _AzkarCardState extends State<AzkarCard>
   Widget build(BuildContext context) {
     super.build(context);
 
-    if (_isLoading) {
-      return Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        height: 150,
-        decoration: BoxDecoration(
-          color: Colors.grey[200],
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: const Center(
-          child: SizedBox(
-            width: 24,
-            height: 24,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
-        ),
-      );
-    }
-
     return GestureDetector(
       onTap: _incrementCount,
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: _cardColor,
+          color: widget.cardColor,
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
@@ -133,7 +97,7 @@ class _AzkarCardState extends State<AzkarCard>
                   widget.zikr.text,
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: _fontSize,
+                    fontSize: widget.fontSize,
                     height: 2.0,
                     fontWeight: FontWeight.w500,
                     color: const Color.fromARGB(255, 80, 44, 44),
@@ -152,8 +116,8 @@ class _AzkarCardState extends State<AzkarCard>
                       widget.zikr.reference!,
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        fontSize: _fontSize - 2,
-                        color: const Color.fromARGB(255, 255, 255, 255),
+                        fontSize: widget.fontSize - 2,
+                        color: Colors.white,
                         height: 1.6,
                       ),
                     ),
@@ -178,9 +142,7 @@ class _AzkarCardState extends State<AzkarCard>
 
                     Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 8,
-                      ),
+                          horizontal: 24, vertical: 8),
                       decoration: BoxDecoration(
                         color: widget.zikr.isCompleted
                             ? const Color.fromARGB(229, 167, 129, 101)
@@ -195,16 +157,8 @@ class _AzkarCardState extends State<AzkarCard>
                         ],
                       ),
                       child: widget.zikr.isCompleted
-                          ? const Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.check_rounded,
-                                  color: Colors.white,
-                                  size: 26,
-                                ),
-                              ],
-                            )
+                          ? const Icon(Icons.check_rounded,
+                              color: Colors.white, size: 26)
                           : Text(
                               '${widget.zikr.currentCount}/${widget.zikr.count}',
                               style: const TextStyle(
@@ -227,26 +181,18 @@ class _AzkarCardState extends State<AzkarCard>
                       borderRadius: BorderRadius.circular(20),
                       child: const Padding(
                         padding: EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
-                        ),
+                            horizontal: 16, vertical: 8),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(
-                              Icons.refresh_rounded,
-                              size: 18,
-                              color: Color(0xFF5F7C7A),
-                            ),
+                            Icon(Icons.refresh_rounded,
+                                size: 18, color: Color(0xFF5F7C7A)),
                             SizedBox(width: 6),
-                            Text(
-                              'إعادة',
-                              style: TextStyle(
-                                color: Color(0xFF5F7C7A),
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
+                            Text('إعادة',
+                                style: TextStyle(
+                                    color: Color(0xFF5F7C7A),
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600)),
                           ],
                         ),
                       ),

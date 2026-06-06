@@ -11,7 +11,7 @@ class AzkarSettingsScreen extends StatefulWidget {
 class _AzkarSettingsScreenState extends State<AzkarSettingsScreen> {
   final AzkarSettingsService _settingsService = AzkarSettingsService();
   
-  double _fontSize = 24.0;
+  double _fontSize = 22.0;
   Color _cardColor = const Color.fromARGB(240, 230, 237, 205);
   
   final List<Color> _availableColors = [

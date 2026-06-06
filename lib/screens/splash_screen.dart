@@ -160,34 +160,34 @@ class _SplashScreenState extends State<SplashScreen>
                   const Spacer(flex: 2),
 
                   // Loading indicator
-                  FadeTransition(
-                    opacity: _fadeAnimation,
-                    child: Column(
-                      children: [
-                        SizedBox(
-                          width: 35,
-                          height: 35,
-                          child: CircularProgressIndicator(
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              Colors.white.withValues(alpha: .7),
-                            ),
-                            strokeWidth: 2.5,
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        Text(
-                          'جاري التحميل...',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.white.withValues(alpha: .7),
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  // FadeTransition(
+                    // opacity: _fadeAnimation,
+                    // child: Column(
+                      // children: [
+                      //   SizedBox(
+                      //     width: 35,
+                      //     height: 35,
+                      //     child: CircularProgressIndicator(
+                      //       valueColor: AlwaysStoppedAnimation<Color>(
+                      //         Colors.white.withValues(alpha: .7),
+                      //       ),
+                      //       strokeWidth: 2.5,
+                      //     ),
+                      //   ),
+                      //   const SizedBox(height: 20),
+                      //   // Text(
+                      //   //   'جاري التحميل...',
+                      //   //   style: TextStyle(
+                      //   //     fontSize: 14,
+                      //   //     color: Colors.white.withValues(alpha: .7),
+                      //   //     fontWeight: FontWeight.w500,
+                      //   //   ),
+                      //   // ),
+                      // ],
+                    // ),
+                  // ),
 
-                  const SizedBox(height: 50),
+                  // const SizedBox(height: 50),
                 ],
               );
             },
