@@ -1,24 +1,18 @@
 package com.example.azkar_app
 
+import android.app.AlarmManager
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import android.os.Bundle
-import android.view.WindowManager
+import android.os.PowerManager
+import android.provider.Settings
 
 class MainActivity: FlutterActivity() {
     private val CHANNEL = "com.example.azkar_app/battery"
-
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        
-        // Allow notifications to show on lock screen
-        window.addFlags(
-            WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
-            WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
-            WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
-        )
-    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -27,6 +21,33 @@ class MainActivity: FlutterActivity() {
             when (call.method) {
                 "requestBatteryOptimization" -> {
                     requestBatteryOptimizationExemption()
+                    result.success(null)
+                }
+                "isIgnoringBatteryOptimizations" -> {
+                    result.success(isIgnoringBatteryOptimizations())
+                }
+                "schedulePrayerAlarms" -> {
+                    val alarms = call.argument<List<Map<String, Any>>>("alarms") ?: emptyList()
+                    val scheduled = AdhanAlarmScheduler.schedulePrayerAlarms(this, alarms)
+                    result.success(scheduled)
+                }
+                "cancelPrayerAlarms" -> {
+                    AdhanAlarmScheduler.cancelPrayerAlarms(this)
+                    result.success(null)
+                }
+                "stopAdhan" -> {
+                    AdhanPlaybackService.stop(this)
+                    result.success(null)
+                }
+                "canScheduleExactAlarms" -> {
+                    result.success(canScheduleExactAlarms())
+                }
+                "openExactAlarmSettings" -> {
+                    openExactAlarmSettings()
+                    result.success(null)
+                }
+                "openAdhanNotificationSettings" -> {
+                    openAdhanNotificationSettings()
                     result.success(null)
                 }
                 else -> {
@@ -38,12 +59,50 @@ class MainActivity: FlutterActivity() {
 
     private fun requestBatteryOptimizationExemption() {
         try {
-            val intent = android.content.Intent()
-            intent.action = android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS
-            intent.data = android.net.Uri.parse("package:$packageName")
+            if (isIgnoringBatteryOptimizations()) return
+            val intent = Intent()
+            intent.action = Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS
+            intent.data = Uri.parse("package:$packageName")
             startActivity(intent)
         } catch (e: Exception) {
             e.printStackTrace()
         }
+    }
+
+    private fun isIgnoringBatteryOptimizations(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val powerManager = getSystemService(PowerManager::class.java)
+            powerManager.isIgnoringBatteryOptimizations(packageName)
+        } else {
+            true
+        }
+    }
+
+    private fun canScheduleExactAlarms(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return true
+        val alarmManager = getSystemService(AlarmManager::class.java)
+        return alarmManager.canScheduleExactAlarms()
+    }
+
+    private fun openExactAlarmSettings() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
+        val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+            data = Uri.parse("package:$packageName")
+        }
+        startActivity(intent)
+    }
+
+    private fun openAdhanNotificationSettings() {
+        val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS).apply {
+                putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+                putExtra(Settings.EXTRA_CHANNEL_ID, AdhanPlaybackService.CHANNEL_ID)
+            }
+        } else {
+            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                data = Uri.parse("package:$packageName")
+            }
+        }
+        startActivity(intent)
     }
 }

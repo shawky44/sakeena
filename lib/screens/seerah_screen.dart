@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/seerah_story.dart';
 import '../data/seerah_data.dart';
 import '../services/storage_service.dart';
+import '../utils/instant_page_route.dart';
 import 'seerah_detail_screen.dart';
 
 class SeerahScreen extends StatefulWidget {
@@ -29,7 +30,6 @@ class _SeerahScreenState extends State<SeerahScreen> with SingleTickerProviderSt
     _loadData();
   }
 
-  // تحميل البيانات المحفوظة
   Future<void> _loadData() async {
     final favorites = await StorageService.getFavorites();
     final completed = await StorageService.getCompleted();
@@ -80,7 +80,6 @@ class _SeerahScreenState extends State<SeerahScreen> with SingleTickerProviderSt
         _favorites.add(id);
       }
     });
-    // حفظ فوري
     await StorageService.saveFavorites(_favorites);
   }
 
@@ -88,7 +87,6 @@ class _SeerahScreenState extends State<SeerahScreen> with SingleTickerProviderSt
     setState(() {
       _completed.add(id);
     });
-    // حفظ فوري
     await StorageService.saveCompleted(_completed);
   }
 
@@ -388,7 +386,7 @@ class _SeerahScreenState extends State<SeerahScreen> with SingleTickerProviderSt
           onTap: () async {
             final result = await Navigator.push(
               context,
-              MaterialPageRoute(
+              InstantPageRoute(
                 builder: (context) => SeerahDetailScreen(story: story),
               ),
             );
@@ -398,7 +396,6 @@ class _SeerahScreenState extends State<SeerahScreen> with SingleTickerProviderSt
           },
           child: Stack(
             children: [
-              // Completed Badge
               if (isCompleted)
                 Positioned(
                   top: 15,

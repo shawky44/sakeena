@@ -4,6 +4,7 @@ import 'package:azkar_app/screens/qibla_screen.dart';
 import 'package:azkar_app/screens/seerah_screen.dart';
 import 'package:azkar_app/screens/tasbih_screen.dart';
 import 'package:azkar_app/screens/arbaeen_screen.dart';
+import 'package:azkar_app/utils/instant_page_route.dart';
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
 
@@ -14,9 +15,10 @@ class MoreScreen extends StatefulWidget {
   State<MoreScreen> createState() => _MoreScreenState();
 }
 
-class _MoreScreenState extends State<MoreScreen> with SingleTickerProviderStateMixin {
+class _MoreScreenState extends State<MoreScreen>
+    with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
-  
+
   @override
   void initState() {
     super.initState();
@@ -73,7 +75,8 @@ class _MoreScreenState extends State<MoreScreen> with SingleTickerProviderStateM
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 20, vertical: 12),
                                 decoration: BoxDecoration(
                                   color: Colors.white.withValues(alpha: .15),
                                   borderRadius: BorderRadius.circular(20),
@@ -130,13 +133,14 @@ class _MoreScreenState extends State<MoreScreen> with SingleTickerProviderStateM
 
               // Grid Cards
               SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 sliver: SliverGrid(
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
                     crossAxisSpacing: 16,
                     mainAxisSpacing: 16,
-                    childAspectRatio: 0.95,
+                    childAspectRatio: 1,
                   ),
                   delegate: SliverChildListDelegate([
                     _buildAnimatedCard(
@@ -151,10 +155,10 @@ class _MoreScreenState extends State<MoreScreen> with SingleTickerProviderStateM
                       ),
                       onTap: () => Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => const TasbihScreen()),
+                        InstantPageRoute(
+                            builder: (context) => const TasbihScreen()),
                       ),
                     ),
-                    
                     _buildAnimatedCard(
                       context,
                       delay: 100,
@@ -167,10 +171,10 @@ class _MoreScreenState extends State<MoreScreen> with SingleTickerProviderStateM
                       ),
                       onTap: () => Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => const QiblaScreen()),
+                        InstantPageRoute(
+                            builder: (context) => const QiblaScreen()),
                       ),
                     ),
-                    
                     _buildAnimatedCardWithImage(
                       context,
                       delay: 200,
@@ -183,10 +187,10 @@ class _MoreScreenState extends State<MoreScreen> with SingleTickerProviderStateM
                       ),
                       onTap: () => Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => const AllahNamesScreen()),
+                        InstantPageRoute(
+                            builder: (context) => const AllahNamesScreen()),
                       ),
                     ),
-                    
                     _buildAnimatedCard(
                       context,
                       delay: 300,
@@ -196,16 +200,17 @@ class _MoreScreenState extends State<MoreScreen> with SingleTickerProviderStateM
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                         colors: [
-                                      Color(0xFF2E7D6E),
-                                      Color(0xFF4A9B8E),
-                                      Color(0xFF6BB9AD),
-                                    ],                      ),
+                          Color(0xFF2E7D6E),
+                          Color(0xFF4A9B8E),
+                          Color(0xFF6BB9AD),
+                        ],
+                      ),
                       onTap: () => Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => const ArbaeenScreen()),
+                        InstantPageRoute(
+                            builder: (context) => const ArbaeenScreen()),
                       ),
                     ),
-                    
                     _buildAnimatedCard(
                       context,
                       delay: 400,
@@ -218,32 +223,33 @@ class _MoreScreenState extends State<MoreScreen> with SingleTickerProviderStateM
                       ),
                       onTap: () => Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => const AzkarScreen()),
+                        InstantPageRoute(
+                            builder: (context) => const AzkarScreen()),
                       ),
                     ),
-                    
                     _buildAnimatedCard(
                       context,
                       delay: 500,
                       icon: Icons.auto_stories,
                       title: 'قصص الصحابة والأنبياء',
                       gradient: const LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
                           colors: [
-                                        Color(0xFF1A5F7A),
-                                        Color(0xFF159895),
-                                        Color(0xFF57C5B6),
-                                      ]                      ),
+                            Color(0xFF1A5F7A),
+                            Color(0xFF159895),
+                            Color(0xFF57C5B6),
+                          ]),
                       onTap: () => Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => const SeerahScreen()),
+                        InstantPageRoute(
+                            builder: (context) => const SeerahScreen()),
                       ),
                     ),
                   ]),
                 ),
               ),
-              
+
               // Bottom Spacing
               const SliverToBoxAdapter(
                 child: SizedBox(height: 30),
@@ -315,79 +321,93 @@ class _MoreScreenState extends State<MoreScreen> with SingleTickerProviderStateM
                   ),
                 ),
               ),
-              
+
               // Content
-              Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    const Spacer(),
-                    
-                    // Icon Container
-                    Container(
-                      padding: const EdgeInsets.all(18),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: .15),
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: .3),
-                          width: 2,
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final compact = constraints.maxHeight < 190;
+                  final padding = compact ? 14.0 : 20.0;
+                  final textWidth = constraints.maxWidth - (padding * 2);
+                  return Padding(
+                    padding: EdgeInsets.all(padding),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        // Icon Container
+                        Container(
+                          padding: EdgeInsets.all(compact ? 13 : 18),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: .15),
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: .3),
+                              width: 2,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: .2),
+                                blurRadius: 15,
+                                offset: const Offset(0, 5),
+                              ),
+                            ],
+                          ),
+                          child: Icon(
+                            icon,
+                            size: compact ? 32 : 40,
+                            color: Colors.white,
+                          ),
                         ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: .2),
-                            blurRadius: 15,
-                            offset: const Offset(0, 5),
+
+                        SizedBox(height: compact ? 10 : 16),
+
+                        // Title
+                        Flexible(
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: SizedBox(
+                              width: textWidth,
+                              child: Text(
+                                title,
+                                textAlign: TextAlign.center,
+                                maxLines: 2,
+                                style: TextStyle(
+                                  fontSize: compact ? 15 : 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                  height: 1.25,
+                                  shadows: const [
+                                    Shadow(
+                                      color: Colors.black26,
+                                      offset: Offset(1, 1),
+                                      blurRadius: 3,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
                           ),
-                        ],
-                      ),
-                      child: Icon(
-                        icon,
-                        size: 40,
-                        color: Colors.white,
-                      ),
-                    ),
-                    
-                    const Spacer(),
-                    
-                    // Title
-                    Text(
-                      title,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                        height: 1.3,
-                        shadows: [
-                          Shadow(
-                            color: Colors.black26,
-                            offset: Offset(1, 1),
-                            blurRadius: 3,
+                        ),
+
+                        const SizedBox(height: 8),
+
+                        // Arrow Icon
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: .2),
+                            borderRadius: BorderRadius.circular(8),
                           ),
-                        ],
-                      ),
+                          child: const Icon(
+                            Icons.arrow_back_ios_new,
+                            size: 12,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
                     ),
-                    
-                    const SizedBox(height: 8),
-                    
-                    // Arrow Icon
-                    Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: .2),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(
-                        Icons.arrow_back_ios_new,
-                        size: 12,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ],
-                ),
+                  );
+                },
               ),
             ],
           ),
@@ -464,87 +484,102 @@ class _MoreScreenState extends State<MoreScreen> with SingleTickerProviderStateM
                   ),
                 ),
               ),
-              
+
               // Content
-              Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    const Spacer(),
-                    
-                    // Image Container
-                    Container(
-                      padding: const EdgeInsets.all(18),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: .15),
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: .3),
-                          width: 2,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: .2),
-                            blurRadius: 15,
-                            offset: const Offset(0, 5),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final compact = constraints.maxHeight < 190;
+                  final padding = compact ? 14.0 : 20.0;
+                  final imageSize = compact ? 32.0 : 40.0;
+                  final textWidth = constraints.maxWidth - (padding * 2);
+                  return Padding(
+                    padding: EdgeInsets.all(padding),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        // Image Container
+                        Container(
+                          padding: EdgeInsets.all(compact ? 13 : 18),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: .15),
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: .3),
+                              width: 2,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: .2),
+                                blurRadius: 15,
+                                offset: const Offset(0, 5),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                      child: Image.asset(
-                        imagePath,
-                        width: 40,
-                        height: 40,
-                        color: Colors.white,
-                        errorBuilder: (context, error, stackTrace) {
-                          return const Icon(
-                            Icons.auto_awesome,
-                            size: 40,
+                          child: Image.asset(
+                            imagePath,
+                            width: imageSize,
+                            height: imageSize,
                             color: Colors.white,
-                          );
-                        },
-                      ),
-                    ),
-                    
-                    const Spacer(),
-                    
-                    // Title
-                    Text(
-                      title,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                        height: 1.3,
-                        shadows: [
-                          Shadow(
-                            color: Colors.black26,
-                            offset: Offset(1, 1),
-                            blurRadius: 3,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Icon(
+                                Icons.auto_awesome,
+                                size: imageSize,
+                                color: Colors.white,
+                              );
+                            },
                           ),
-                        ],
-                      ),
+                        ),
+
+                        SizedBox(height: compact ? 10 : 16),
+
+                        // Title
+                        Flexible(
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: SizedBox(
+                              width: textWidth,
+                              child: Text(
+                                title,
+                                textAlign: TextAlign.center,
+                                maxLines: 2,
+                                style: TextStyle(
+                                  fontSize: compact ? 15 : 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                  height: 1.25,
+                                  shadows: const [
+                                    Shadow(
+                                      color: Colors.black26,
+                                      offset: Offset(1, 1),
+                                      blurRadius: 3,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(height: 8),
+
+                        // Arrow Icon
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: .2),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(
+                            Icons.arrow_back_ios_new,
+                            size: 12,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
                     ),
-                    
-                    const SizedBox(height: 8),
-                    
-                    // Arrow Icon
-                    Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: .2),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(
-                        Icons.arrow_back_ios_new,
-                        size: 12,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ],
-                ),
+                  );
+                },
               ),
             ],
           ),

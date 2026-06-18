@@ -12,7 +12,6 @@ class Zikr {
   DateTime? lastResetDate;
   int position;
 
-  // NEW: Callback للتحديث
   VoidCallback? onProgressChanged;
 
   Zikr({

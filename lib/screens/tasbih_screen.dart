@@ -59,7 +59,6 @@ class _TasbihScreenState extends State<TasbihScreen> with TickerProviderStateMix
 
   Future<void> _incrementCounter() async {
     if (counter < targetCount) {
-      // Animation
       _scaleController.forward().then((_) => _scaleController.reverse());
       _rotationController.forward().then((_) => _rotationController.reverse());
       
@@ -67,10 +66,8 @@ class _TasbihScreenState extends State<TasbihScreen> with TickerProviderStateMix
         counter++;
       });
 
-      // تشغيل الصوت
       await _playTasbihSound();
 
-      // تشغيل الاهتزاز
       try {
         final hasVibrator = await Vibration.hasVibrator();
         if (hasVibrator == true) {
@@ -80,7 +77,6 @@ class _TasbihScreenState extends State<TasbihScreen> with TickerProviderStateMix
         debugPrint('❌ Vibration error: $e');
       }
 
-      // إذا وصل للهدف
       if (counter == targetCount) {
         _showCompletionDialog();
       }
@@ -543,7 +539,6 @@ class _TasbihScreenState extends State<TasbihScreen> with TickerProviderStateMix
         child: SafeArea(
           child: Column(
             children: [
-              // Modern AppBar
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
                 child: Container(
@@ -605,7 +600,6 @@ class _TasbihScreenState extends State<TasbihScreen> with TickerProviderStateMix
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
-                      // Dhikr Text Card
                       Container(
                         padding: const EdgeInsets.all(24),
                         decoration: BoxDecoration(
@@ -669,7 +663,6 @@ class _TasbihScreenState extends State<TasbihScreen> with TickerProviderStateMix
                         ),
                       ),
 
-                      // Counter Circle with Animation
                       ScaleTransition(
                         scale: _scaleAnimation,
                         child: RotationTransition(
@@ -680,7 +673,6 @@ class _TasbihScreenState extends State<TasbihScreen> with TickerProviderStateMix
                             child: Stack(
                               alignment: Alignment.center,
                               children: [
-                                // Outer Glow
                                 Container(
                                   width: 280,
                                   height: 280,
@@ -696,7 +688,6 @@ class _TasbihScreenState extends State<TasbihScreen> with TickerProviderStateMix
                                   ),
                                 ),
                                 
-                                // Progress Ring
                                 SizedBox(
                                   width: 260,
                                   height: 260,
@@ -711,7 +702,6 @@ class _TasbihScreenState extends State<TasbihScreen> with TickerProviderStateMix
                                   ),
                                 ),
                                 
-                                // Counter Button
                                 Container(
                                   width: 220,
                                   height: 220,
@@ -737,7 +727,6 @@ class _TasbihScreenState extends State<TasbihScreen> with TickerProviderStateMix
                                   ),
                                   child: Stack(
                                     children: [
-                                      // Background Pattern
                                       Center(
                                         child: Transform.rotate(
                                           angle: math.pi / 4,
@@ -749,7 +738,6 @@ class _TasbihScreenState extends State<TasbihScreen> with TickerProviderStateMix
                                         ),
                                       ),
                                       
-                                      // Counter Text
                                       Center(
                                         child: Column(
                                           mainAxisAlignment: MainAxisAlignment.center,
@@ -801,7 +789,6 @@ class _TasbihScreenState extends State<TasbihScreen> with TickerProviderStateMix
                         ),
                       ),
 
-                      // Quick Target Buttons
                       Container(
                         padding: const EdgeInsets.all(4),
                         decoration: BoxDecoration(
@@ -824,7 +811,6 @@ class _TasbihScreenState extends State<TasbihScreen> with TickerProviderStateMix
                         ),
                       ),
 
-                      // Reset Button
                       Container(
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(20),

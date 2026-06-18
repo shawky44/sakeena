@@ -1,8 +1,12 @@
-
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ui' as ui;
+import 'package:azkar_app/screens/adhan_settings_screen.dart';
 import 'package:azkar_app/screens/journey_screen.dart';
+import 'package:azkar_app/services/background_service.dart';
+import 'package:azkar_app/services/prayer_calculation_service.dart';
 import 'package:azkar_app/services/prayer_notification_service.dart';
+import 'package:azkar_app/utils/instant_page_route.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:adhan_dart/adhan_dart.dart';
@@ -13,7 +17,6 @@ import 'package:azkar_app/screens/calendar_screen.dart';
 import 'package:azkar_app/screens/more_screen.dart';
 import 'package:azkar_app/widgets/main_content_section.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:azkar_app/services/zikr_popup_notification.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -22,8 +25,12 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   DateTime? _lastBackPressTime;
+  bool _reliabilityFlowActive = false;
+  bool _rescheduleWhenReliabilityReady = false;
+  ReliabilityRequirement? _lastPromptedRequirement;
+  DateTime? _lastReliabilityPromptAt;
   Map<String, String> allPrayerTimes = {
     'الفجر': '--:--',
     'الظهر': '--:--',
@@ -58,23 +65,147 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _loadCachedDataAndRefresh();
-    _initZikrNotifications();
+    WidgetsBinding.instance.addObserver(this);
+    final initialPrayerLoad = _loadCachedDataAndRefresh();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future<void>(() async {
+        await initialPrayerLoad;
+        await Future<void>.delayed(const Duration(milliseconds: 500));
+        if (mounted &&
+            WidgetsBinding.instance.lifecycleState ==
+                AppLifecycleState.resumed) {
+          _showBackgroundReliabilityPromptIfNeeded();
+        }
+      });
+    });
   }
 
-  Future<void> _initZikrNotifications() async {
-    final zikrService = ZikrPopupNotification();
-    final isEnabled = await zikrService.isEnabled();
-    if (!isEnabled) {
-      await zikrService.start(intervalHours: 4);
-      debugPrint('✅ Zikr notifications started');
-    } else {
-      debugPrint('✅ Zikr notifications already running');
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) return;
+    Future.delayed(const Duration(milliseconds: 700), () {
+      if (mounted) _showBackgroundReliabilityPromptIfNeeded();
+    });
+  }
+
+  Future<void> _showBackgroundReliabilityPromptIfNeeded() async {
+    if (_reliabilityFlowActive ||
+        WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed) {
+      return;
+    }
+
+    final service = PrayerNotificationService();
+    final requirement = await service.getMissingReliabilityRequirement();
+    if (!mounted) return;
+    if (requirement == null) {
+      if (_rescheduleWhenReliabilityReady) {
+        _rescheduleWhenReliabilityReady = false;
+        await PrayerBackgroundService().scheduleDailyPrayers();
+      }
+      return;
+    }
+    _rescheduleWhenReliabilityReady = true;
+
+    final now = DateTime.now();
+    if (_lastPromptedRequirement == requirement &&
+        _lastReliabilityPromptAt != null &&
+        now.difference(_lastReliabilityPromptAt!) <
+            const Duration(seconds: 30)) {
+      return;
+    }
+
+    _reliabilityFlowActive = true;
+    _lastPromptedRequirement = requirement;
+    _lastReliabilityPromptAt = now;
+
+    final title = switch (requirement) {
+      ReliabilityRequirement.notifications => 'السماح بالإشعارات',
+      ReliabilityRequirement.exactAlarm => 'دقة موعد الأذان',
+      ReliabilityRequirement.backgroundLocation => 'تحديث الموقع أثناء السفر',
+      ReliabilityRequirement.batteryOptimization => 'العمل في الخلفية',
+    };
+    final arabicMessage = switch (requirement) {
+      ReliabilityRequirement.notifications =>
+        'اسمح بإشعارات التطبيق حتى تظهر تنبيهات الصلاة ويعمل إشعار الأذان بشكل صحيح.',
+      ReliabilityRequirement.exactAlarm =>
+        'فعّل السماح بالمنبهات الدقيقة حتى يبدأ الأذان في موعده دون تأخير.',
+      ReliabilityRequirement.backgroundLocation =>
+        'اختر السماح بالموقع طوال الوقت حتى يستطيع التطبيق تحديث مواقيت الصلاة عند السفر وهو مغلق. يتم فحص الموقع مرة واحدة فقط وقت التجديد اليومي، وليس تتبعك باستمرار.',
+      ReliabilityRequirement.batteryOptimization =>
+        'اسمح للتطبيق بالعمل دون تقييد البطارية حتى تستمر المواعيد عند إغلاق التطبيق.',
+    };
+    final englishMessage = switch (requirement) {
+      ReliabilityRequirement.notifications =>
+        'Allow notifications so prayer reminders and the Adhan notification can appear.',
+      ReliabilityRequirement.exactAlarm =>
+        'Allow exact alarms so the Adhan can start at the scheduled time.',
+      ReliabilityRequirement.backgroundLocation =>
+        'Allow location all the time so prayer times can update after travel while the app is closed. Location is checked only during the daily refresh.',
+      ReliabilityRequirement.batteryOptimization =>
+        'Allow unrestricted battery use for reliable background scheduling.',
+    };
+
+    try {
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => Directionality(
+          textDirection: ui.TextDirection.rtl,
+          child: AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(18),
+            ),
+            title: Text(title, textAlign: TextAlign.right),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  arabicMessage,
+                  textAlign: TextAlign.right,
+                  style: const TextStyle(height: 1.5),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  englishMessage,
+                  textDirection: ui.TextDirection.ltr,
+                  style: const TextStyle(
+                    height: 1.4,
+                    color: Color(0xFF5F7C7A),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+            actionsAlignment: MainAxisAlignment.center,
+            actions: [
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF5F7C7A),
+                ),
+                onPressed: () => Navigator.pop(context),
+                child: const Text('متابعة'),
+              ),
+            ],
+          ),
+        ),
+      );
+      await service.resolveReliabilityRequirement(requirement);
+    } finally {
+      _reliabilityFlowActive = false;
+    }
+
+    if (mounted &&
+        WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (mounted) _showBackgroundReliabilityPromptIfNeeded();
+      });
     }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _refreshPrayerTimer?.cancel();
     super.dispose();
   }
@@ -82,7 +213,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _loadCachedDataAndRefresh() async {
     try {
       await _loadCachedPrayerData();
-      _refreshPrayerDataInBackground();
+      await _refreshPrayerDataInBackground();
     } catch (e) {
       debugPrint('Error loading cached data: $e');
       _initPrayerLogic();
@@ -93,17 +224,19 @@ class _HomeScreenState extends State<HomeScreen> {
     final prefs = await SharedPreferences.getInstance();
 
     final cachedPrayerTimesJson = prefs.getString('cached_prayer_times');
-    final cachedNextPrayer      = prefs.getString('cached_next_prayer');
-    final cachedNextPrayerTime  = prefs.getString('cached_next_prayer_time');
-    final cachedLocation        = prefs.getString('cached_location');
+    final cachedNextPrayer = prefs.getString('cached_next_prayer');
+    final cachedNextPrayerTime = prefs.getString('cached_next_prayer_time');
+    final cachedLocation = prefs.getString('cached_location');
 
     if (cachedPrayerTimesJson != null && cachedNextPrayer != null) {
-      final Map<String, dynamic> decodedTimes = json.decode(cachedPrayerTimesJson);
+      final Map<String, dynamic> decodedTimes =
+          json.decode(cachedPrayerTimesJson);
       setState(() {
-        allPrayerTimes     = Map<String, String>.from(decodedTimes);
-        nextPrayerName     = cachedNextPrayer;
-        displayPrayerTime  = prefs.getString('cached_next_prayer_display') ?? '--:--';
-        userLocation       = cachedLocation ?? 'موقعك';
+        allPrayerTimes = Map<String, String>.from(decodedTimes);
+        nextPrayerName = cachedNextPrayer;
+        displayPrayerTime =
+            prefs.getString('cached_next_prayer_display') ?? '--:--';
+        userLocation = cachedLocation ?? 'موقعك';
         if (cachedNextPrayerTime != null) {
           nextPrayerTime = DateTime.tryParse(cachedNextPrayerTime);
         }
@@ -111,24 +244,36 @@ class _HomeScreenState extends State<HomeScreen> {
       debugPrint('✅ Loaded cached prayer data instantly!');
     }
 
-    _cachedLat      = prefs.getDouble('cached_lat');
-    _cachedLon      = prefs.getDouble('cached_lon');
+    _cachedLat = prefs.getDouble('cached_lat');
+    _cachedLon = prefs.getDouble('cached_lon');
     _currentCountry = prefs.getString('cached_country');
   }
 
   Future<void> _refreshPrayerDataInBackground() async {
     try {
-      final prefs     = await SharedPreferences.getInstance();
+      final prefs = await SharedPreferences.getInstance();
       final lastUpdate = prefs.getString('last_prayer_update');
-      final today      = DateFormat('yyyy-MM-dd').format(DateTime.now());
+      final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
 
       if (lastUpdate == today && _cachedLat != null && _cachedLon != null) {
         await _calculateAndSetPrayer(_cachedLat!, _cachedLon!, _currentCountry);
-        debugPrint('✅ Prayer times are up to date, recalculated next prayer only');
+        await _scheduleNotificationsWithPosition(
+          _cachedLat!,
+          _cachedLon!,
+          _currentCountry,
+        );
+        _startPrayerRefreshTimer();
+        _scheduleDailyNotificationRefresh(
+          _cachedLat!,
+          _cachedLon!,
+          _currentCountry,
+        );
+        debugPrint(
+            '✅ Prayer times are up to date and alarms were re-registered');
         return;
       }
 
-      final pos     = await _determinePosition();
+      final pos = await _determinePosition();
       final country = await _getLocationName(pos);
       _currentCountry = country;
 
@@ -137,18 +282,14 @@ class _HomeScreenState extends State<HomeScreen> {
       _cachedLon = pos.longitude;
 
       await _calculateAndSetPrayer(pos.latitude, pos.longitude, country);
-      await _scheduleNotificationsWithPosition(pos.latitude, pos.longitude, country);
+      await _scheduleNotificationsWithPosition(
+          pos.latitude, pos.longitude, country);
       await prefs.setString('last_prayer_update', today);
 
-      _refreshPrayerTimer = Timer.periodic(const Duration(minutes: 1), (_) async {
-        if (_cachedLat != null && _cachedLon != null) {
-          await _calculateAndSetPrayer(_cachedLat!, _cachedLon!, _currentCountry);
-        }
-      });
+      _startPrayerRefreshTimer();
 
       _scheduleDailyNotificationRefresh(pos.latitude, pos.longitude, country);
       debugPrint('✅ Prayer data refreshed in background');
-
     } catch (e) {
       debugPrint('Background refresh error: $e');
       if (_cachedLat == null || _cachedLon == null) {
@@ -160,7 +301,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _initPrayerLogic() async {
     try {
-      final pos     = await _determinePosition();
+      final pos = await _determinePosition();
       final country = await _getLocationName(pos);
       _currentCountry = country;
 
@@ -169,16 +310,12 @@ class _HomeScreenState extends State<HomeScreen> {
       _cachedLon = pos.longitude;
 
       await _calculateAndSetPrayer(pos.latitude, pos.longitude, country);
-      await _scheduleNotificationsWithPosition(pos.latitude, pos.longitude, country);
+      await _scheduleNotificationsWithPosition(
+          pos.latitude, pos.longitude, country);
 
-      _refreshPrayerTimer = Timer.periodic(const Duration(minutes: 1), (_) async {
-        if (_cachedLat != null && _cachedLon != null) {
-          await _calculateAndSetPrayer(_cachedLat!, _cachedLon!, _currentCountry);
-        }
-      });
+      _startPrayerRefreshTimer();
 
       _scheduleDailyNotificationRefresh(pos.latitude, pos.longitude, country);
-
     } catch (e) {
       debugPrint('Prayer init error: $e');
       await _calculateAndSetPrayer(30.0444, 31.2357, 'Egypt');
@@ -186,11 +323,25 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _saveCachedLocation(double lat, double lon, String? country) async {
+  Future<void> _saveCachedLocation(
+      double lat, double lon, String? country) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setDouble('cached_lat', lat);
     await prefs.setDouble('cached_lon', lon);
     if (country != null) await prefs.setString('cached_country', country);
+  }
+
+  void _startPrayerRefreshTimer() {
+    _refreshPrayerTimer?.cancel();
+    _refreshPrayerTimer = Timer.periodic(const Duration(minutes: 1), (_) async {
+      if (_cachedLat != null && _cachedLon != null) {
+        await _calculateAndSetPrayer(
+          _cachedLat!,
+          _cachedLon!,
+          _currentCountry,
+        );
+      }
+    });
   }
 
   Future<void> _savePrayerTimesToCache(
@@ -204,98 +355,44 @@ class _HomeScreenState extends State<HomeScreen> {
     await prefs.setString('cached_next_prayer', nextPrayer);
     await prefs.setString('cached_next_prayer_display', nextPrayerDisplay);
     if (nextPrayerDateTime != null) {
-      await prefs.setString('cached_next_prayer_time', nextPrayerDateTime.toIso8601String());
+      await prefs.setString(
+          'cached_next_prayer_time', nextPrayerDateTime.toIso8601String());
     }
   }
 
-  CalculationParameters _getCalculationMethod(double lat, double lon, String? country) {
-    final countryLower = country?.toLowerCase() ?? '';
-    CalculationParameters params;
-
-    if (countryLower.contains('egypt') || countryLower.contains('مصر') ||
-        countryLower.contains('sudan') || countryLower.contains('السودان') ||
-        countryLower.contains('libya') || countryLower.contains('ليبيا')) {
-      params = CalculationMethod.egyptian();
-    } else if (countryLower.contains('united states') || countryLower.contains('canada') ||
-               countryLower.contains('أمريكا') || countryLower.contains('كندا') ||
-               (lat > 25 && lat < 50 && lon > -130 && lon < -60)) {
-      params = CalculationMethod.northAmerica();
-    } else if (countryLower.contains('saudi') || countryLower.contains('السعودية') ||
-               countryLower.contains('kuwait') || countryLower.contains('الكويت') ||
-               countryLower.contains('qatar') || countryLower.contains('قطر') ||
-               countryLower.contains('bahrain') || countryLower.contains('البحرين') ||
-               countryLower.contains('emirates') || countryLower.contains('الإمارات') ||
-               countryLower.contains('oman') || countryLower.contains('عمان')) {
-      params = CalculationMethod.ummAlQura();
-    } else if (countryLower.contains('turkey') || countryLower.contains('تركيا') ||
-               countryLower.contains('türkiye')) {
-      params = CalculationMethod.turkiye();
-    } else if (countryLower.contains('iran') || countryLower.contains('إيران') ||
-               countryLower.contains('iraq') || countryLower.contains('العراق')) {
-      params = CalculationMethod.tehran();
-    } else if (countryLower.contains('pakistan') || countryLower.contains('باكستان') ||
-               countryLower.contains('india') || countryLower.contains('الهند') ||
-               countryLower.contains('bangladesh') || countryLower.contains('بنغلاديش')) {
-      params = CalculationMethod.karachi();
-    } else if (countryLower.contains('malaysia') || countryLower.contains('ماليزيا') ||
-               countryLower.contains('singapore') || countryLower.contains('سنغافورة') ||
-               countryLower.contains('indonesia') || countryLower.contains('إندونيسيا') ||
-               countryLower.contains('brunei') || countryLower.contains('بروناي')) {
-      params = CalculationMethod.singapore();
-    } else if (countryLower.contains('morocco') || countryLower.contains('المغرب') ||
-               countryLower.contains('tunisia') || countryLower.contains('تونس') ||
-               countryLower.contains('algeria') || countryLower.contains('الجزائر') ||
-               countryLower.contains('mauritania') || countryLower.contains('موريتانيا')) {
-      params = CalculationMethod.moonsightingCommittee();
-    } else if (countryLower.contains('syria') || countryLower.contains('سوريا') ||
-               countryLower.contains('jordan') || countryLower.contains('الأردن') ||
-               countryLower.contains('palestine') || countryLower.contains('فلسطين') ||
-               countryLower.contains('lebanon') || countryLower.contains('لبنان')) {
-      params = CalculationMethod.muslimWorldLeague();
-    } else if (lat > 40 && lat < 70 && lon > -10 && lon < 40) {
-      params = CalculationMethod.muslimWorldLeague();
-    } else {
-      params = CalculationMethod.muslimWorldLeague();
-    }
-
-    if (countryLower.contains('egypt') || countryLower.contains('saudi') ||
-        countryLower.contains('kuwait') || countryLower.contains('emirates') ||
-        countryLower.contains('malaysia') || countryLower.contains('indonesia') ||
-        countryLower.contains('مصر') || countryLower.contains('السعودية') ||
-        countryLower.contains('الكويت') || countryLower.contains('الإمارات') ||
-        countryLower.contains('ماليزيا') || countryLower.contains('إندونيسيا')) {
-      params.madhab = Madhab.shafi;
-    } else {
-      params.madhab = Madhab.hanafi;
-    }
-
-    if (lat.abs() > 48) params.highLatitudeRule = HighLatitudeRule.middleOfTheNight;
-
-    return params;
-  }
-
-  Future<void> _calculateAndSetPrayer(double lat, double lon, String? country) async {
+  Future<void> _calculateAndSetPrayer(
+      double lat, double lon, String? country) async {
     final coordinates = Coordinates(lat, lon);
-    final now       = DateTime.now();
+    final now = DateTime.now();
     final localDate = DateTime(now.year, now.month, now.day);
-    final params    = _getCalculationMethod(lat, lon, country);
+    final params = PrayerCalculationService.parametersFor(
+      latitude: lat,
+      longitude: lon,
+      country: country,
+    );
 
     final prayerTimes = PrayerTimes(
-      coordinates: coordinates, date: localDate, calculationParameters: params);
+        coordinates: coordinates,
+        date: localDate,
+        calculationParameters: params);
 
-    final fajrTime    = prayerTimes.fajr?.toLocal();
+    final fajrTime = prayerTimes.fajr?.toLocal();
     final sunriseTime = prayerTimes.sunrise?.toLocal();
-    final dhuhrTime   = prayerTimes.dhuhr?.toLocal();
-    final asrTime     = prayerTimes.asr?.toLocal();
+    final dhuhrTime = prayerTimes.dhuhr?.toLocal();
+    final asrTime = prayerTimes.asr?.toLocal();
     final maghribTime = prayerTimes.maghrib?.toLocal();
-    final ishaTime    = prayerTimes.isha?.toLocal();
+    final ishaTime = prayerTimes.isha?.toLocal();
 
     final prayerMap = {
-      'الفجر': fajrTime, 'الشروق': sunriseTime, 'الظهر': dhuhrTime,
-      'العصر': asrTime,  'المغرب': maghribTime,  'العشاء': ishaTime,
+      'الفجر': fajrTime,
+      'الشروق': sunriseTime,
+      'الظهر': dhuhrTime,
+      'العصر': asrTime,
+      'المغرب': maghribTime,
+      'العشاء': ishaTime,
     };
 
-    String?   foundNextPrayerName;
+    String? foundNextPrayerName;
     DateTime? foundNextPrayerTime;
     for (var entry in prayerMap.entries) {
       if (entry.value != null && entry.value!.isAfter(now)) {
@@ -308,74 +405,119 @@ class _HomeScreenState extends State<HomeScreen> {
     if (foundNextPrayerName == null || foundNextPrayerTime == null) {
       final tomorrow = DateTime(now.year, now.month, now.day + 1);
       final tomorrowPrayers = PrayerTimes(
-        coordinates: coordinates, date: tomorrow, calculationParameters: params);
+          coordinates: coordinates,
+          date: tomorrow,
+          calculationParameters: params);
       foundNextPrayerName = 'الفجر';
       foundNextPrayerTime = tomorrowPrayers.fajr?.toLocal();
     }
 
     final formattedPrayerTimes = {
-      'الفجر':  fajrTime    != null ? DateFormat('h:mm a', 'en_US').format(fajrTime)    : '--:--',
-      'الظهر':  dhuhrTime   != null ? DateFormat('h:mm a', 'en_US').format(dhuhrTime)   : '--:--',
-      'العصر':  asrTime     != null ? DateFormat('h:mm a', 'en_US').format(asrTime)     : '--:--',
-      'المغرب': maghribTime != null ? DateFormat('h:mm a', 'en_US').format(maghribTime) : '--:--',
-      'العشاء': ishaTime    != null ? DateFormat('h:mm a', 'en_US').format(ishaTime)    : '--:--',
+      'الفجر': fajrTime != null
+          ? DateFormat('h:mm a', 'en_US').format(fajrTime)
+          : '--:--',
+      'الظهر': dhuhrTime != null
+          ? DateFormat('h:mm a', 'en_US').format(dhuhrTime)
+          : '--:--',
+      'العصر': asrTime != null
+          ? DateFormat('h:mm a', 'en_US').format(asrTime)
+          : '--:--',
+      'المغرب': maghribTime != null
+          ? DateFormat('h:mm a', 'en_US').format(maghribTime)
+          : '--:--',
+      'العشاء': ishaTime != null
+          ? DateFormat('h:mm a', 'en_US').format(ishaTime)
+          : '--:--',
     };
 
     final formattedNextTime = foundNextPrayerTime != null
-        ? DateFormat('h:mm a', 'en_US').format(foundNextPrayerTime) : '--:--';
+        ? DateFormat('h:mm a', 'en_US').format(foundNextPrayerTime)
+        : '--:--';
 
     final prefsForJourney = await SharedPreferences.getInstance();
-    final prayerTimeKeys  = {
-      'الفجر': fajrTime, 'الظهر': dhuhrTime, 'العصر': asrTime,
-      'المغرب': maghribTime, 'العشاء': ishaTime,
+    final prayerTimeKeys = {
+      'الفجر': fajrTime,
+      'الظهر': dhuhrTime,
+      'العصر': asrTime,
+      'المغرب': maghribTime,
+      'العشاء': ishaTime,
     };
     final keyMap = {
-      'الفجر': 'cached_fajr_time', 'الظهر': 'cached_dhuhr_time',
-      'العصر': 'cached_asr_time',  'المغرب': 'cached_maghrib_time', 'العشاء': 'cached_isha_time',
+      'الفجر': 'cached_fajr_time',
+      'الظهر': 'cached_dhuhr_time',
+      'العصر': 'cached_asr_time',
+      'المغرب': 'cached_maghrib_time',
+      'العشاء': 'cached_isha_time',
     };
     for (final entry in prayerTimeKeys.entries) {
       if (entry.value != null) {
-        await prefsForJourney.setString(keyMap[entry.key]!, entry.value!.toIso8601String());
+        await prefsForJourney.setString(
+            keyMap[entry.key]!, entry.value!.toIso8601String());
       }
     }
 
+    final nextPrayerNameValue = foundNextPrayerName;
+
     await _savePrayerTimesToCache(
       formattedPrayerTimes,
-      foundNextPrayerName ?? 'الصلاة',
+      nextPrayerNameValue,
       formattedNextTime,
       foundNextPrayerTime,
     );
 
     if (mounted) {
       setState(() {
-        nextPrayerName    = foundNextPrayerName ?? 'الصلاة';
+        nextPrayerName = nextPrayerNameValue;
         displayPrayerTime = formattedNextTime;
-        nextPrayerTime    = foundNextPrayerTime;
-        allPrayerTimes    = formattedPrayerTimes;
+        nextPrayerTime = foundNextPrayerTime;
+        allPrayerTimes = formattedPrayerTimes;
       });
     }
 
     debugPrint('✅ Next Prayer: $foundNextPrayerName at $formattedNextTime');
   }
 
-  Future<void> _scheduleNotificationsWithPosition(double lat, double lon, String? country) async {
-    final Map<String, DateTime> prayerTimesMap = {};
+  Future<void> _scheduleNotificationsWithPosition(
+      double lat, double lon, String? country) async {
+    final prayerTimesMap = <String, DateTime>{};
     final coordinates = Coordinates(lat, lon);
-    final now         = DateTime.now();
-    final localDate   = DateTime(now.year, now.month, now.day);
-    final params      = _getCalculationMethod(lat, lon, country);
+    final now = DateTime.now();
+    final params = PrayerCalculationService.parametersFor(
+      latitude: lat,
+      longitude: lon,
+      country: country,
+    );
 
-    final prayerTimes = PrayerTimes(
-      coordinates: coordinates, date: localDate, calculationParameters: params);
+    for (var dayOffset = 0; dayOffset < 7; dayOffset++) {
+      final localDate = DateTime(now.year, now.month, now.day + dayOffset);
+      final prayerTimes = PrayerTimes(
+        coordinates: coordinates,
+        date: localDate,
+        calculationParameters: params,
+      );
 
-    if (prayerTimes.fajr    != null) prayerTimesMap['الفجر']   = prayerTimes.fajr!.toLocal();
-    if (prayerTimes.sunrise != null) prayerTimesMap['الشروق']  = prayerTimes.sunrise!.toLocal();
-    if (prayerTimes.dhuhr   != null) prayerTimesMap['الظهر']   = prayerTimes.dhuhr!.toLocal();
-    if (prayerTimes.asr     != null) prayerTimesMap['العصر']   = prayerTimes.asr!.toLocal();
-    if (prayerTimes.maghrib != null) prayerTimesMap['المغرب']  = prayerTimes.maghrib!.toLocal();
-    if (prayerTimes.isha    != null) prayerTimesMap['العشاء']  = prayerTimes.isha!.toLocal();
+      if (prayerTimes.fajr != null) {
+        prayerTimesMap['Fajr_$dayOffset'] = prayerTimes.fajr!.toLocal();
+      }
+      if (prayerTimes.sunrise != null) {
+        prayerTimesMap['Sunrise_$dayOffset'] = prayerTimes.sunrise!.toLocal();
+      }
+      if (prayerTimes.dhuhr != null) {
+        prayerTimesMap['Dhuhr_$dayOffset'] = prayerTimes.dhuhr!.toLocal();
+      }
+      if (prayerTimes.asr != null) {
+        prayerTimesMap['Asr_$dayOffset'] = prayerTimes.asr!.toLocal();
+      }
+      if (prayerTimes.maghrib != null) {
+        prayerTimesMap['Maghrib_$dayOffset'] = prayerTimes.maghrib!.toLocal();
+      }
+      if (prayerTimes.isha != null) {
+        prayerTimesMap['Isha_$dayOffset'] = prayerTimes.isha!.toLocal();
+      }
+    }
 
-    await PrayerNotificationService().schedulePrayerNotifications(prayerTimesMap);
+    await PrayerNotificationService()
+        .schedulePrayerNotifications(prayerTimesMap);
   }
 
   Future<Position> _determinePosition() async {
@@ -385,23 +527,30 @@ class _HomeScreenState extends State<HomeScreen> {
     LocationPermission permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) throw Exception('Location permissions are denied');
+      if (permission == LocationPermission.denied) {
+        throw Exception('Location permissions are denied');
+      }
     }
-    if (permission == LocationPermission.deniedForever) throw Exception('Location permissions are permanently denied');
+    if (permission == LocationPermission.deniedForever) {
+      throw Exception('Location permissions are permanently denied');
+    }
 
     return await Geolocator.getCurrentPosition(
-      locationSettings: const LocationSettings(accuracy: LocationAccuracy.high, distanceFilter: 0));
+        locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high, distanceFilter: 0));
   }
 
   Future<String?> _getLocationName(Position pos) async {
     try {
-      final placemarks = await geo.placemarkFromCoordinates(pos.latitude, pos.longitude);
+      final placemarks =
+          await geo.placemarkFromCoordinates(pos.latitude, pos.longitude);
       if (placemarks.isNotEmpty) {
-        final place   = placemarks.first;
+        final place = placemarks.first;
         final country = place.country ?? '';
         if (mounted) {
           setState(() {
-            userLocation = '${place.locality ?? place.subAdministrativeArea ?? 'موقعك'} - $country';
+            userLocation =
+                '${place.locality ?? place.subAdministrativeArea ?? 'موقعك'} - $country';
           });
           SharedPreferences.getInstance().then((prefs) {
             prefs.setString('cached_location', userLocation);
@@ -416,15 +565,60 @@ class _HomeScreenState extends State<HomeScreen> {
     return null;
   }
 
-  void _scheduleDailyNotificationRefresh(double latitude, double longitude, String? country) {
-    final now             = DateTime.now();
-    final nextMidnight    = DateTime(now.year, now.month, now.day + 1);
+  void _scheduleDailyNotificationRefresh(
+      double latitude, double longitude, String? country) {
+    final now = DateTime.now();
+    final nextMidnight = DateTime(now.year, now.month, now.day + 1);
     final durationUntilMidnight = nextMidnight.difference(now);
     Timer(durationUntilMidnight, () async {
       await _calculateAndSetPrayer(latitude, longitude, country);
       await _scheduleNotificationsWithPosition(latitude, longitude, country);
       _scheduleDailyNotificationRefresh(latitude, longitude, country);
     });
+  }
+
+  void _showExitHint() {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+          elevation: 0,
+          backgroundColor: Colors.transparent,
+          margin: const EdgeInsets.fromLTRB(18, 0, 18, 12),
+          padding: EdgeInsets.zero,
+          content: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+            decoration: BoxDecoration(
+              color: const Color(0xFF3F5E59).withValues(alpha: .82),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.white.withValues(alpha: .16)),
+            ),
+            child: const Row(
+              children: [
+                Icon(
+                  Icons.logout_rounded,
+                  color: Colors.white,
+                  size: 19,
+                ),
+                SizedBox(width: 9),
+                Expanded(
+                  child: Text(
+                    'اضغط مرة أخرى للخروج',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
   }
 
   @override
@@ -442,11 +636,7 @@ class _HomeScreenState extends State<HomeScreen> {
           return true;
         }
         _lastBackPressTime = now;
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('اضغط مرة أخرى للخروج'),
-          duration: Duration(seconds: 2),
-          backgroundColor: Color.fromARGB(186, 107, 143, 127),
-        ));
+        _showExitHint();
         return false;
       },
       child: Scaffold(
@@ -488,30 +678,84 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildPrayerHeader() {
-    final backgroundImage = prayerBackgrounds[nextPrayerName] ?? 'assets/images/bg_asr.jpg';
+    final backgroundImage =
+        prayerBackgrounds[nextPrayerName] ?? 'assets/images/bg_asr.jpg';
 
     if (_isLoading && nextPrayerName == '...') {
       return Container(
-        width: double.infinity, height: 270,
-        decoration: BoxDecoration(image: DecorationImage(image: AssetImage(backgroundImage), fit: BoxFit.cover)),
-        child: const Center(child: CircularProgressIndicator(color: Colors.white)),
+        width: double.infinity,
+        height: 270,
+        decoration: BoxDecoration(
+          image: DecorationImage(
+            image: AssetImage(backgroundImage),
+            fit: BoxFit.cover,
+          ),
+        ),
+        child:
+            const Center(child: CircularProgressIndicator(color: Colors.white)),
       );
     }
 
     return Container(
-      width: double.infinity, height: 270,
+      width: double.infinity,
+      height: 270,
       decoration: BoxDecoration(
-        image: DecorationImage(image: AssetImage(backgroundImage), fit: BoxFit.cover)),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        image: DecorationImage(
+          image: AssetImage(backgroundImage),
+          fit: BoxFit.cover,
+        ),
+      ),
+      child: Stack(
         children: [
-          Text('صلاة $nextPrayerName',
-            style: const TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 15),
-          Text(displayPrayerTime,
-            style: const TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          _CountdownText(nextPrayerTime: nextPrayerTime),
+          Positioned(
+            top: 14,
+            right: 14,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: .22),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: Colors.white.withValues(alpha: .18)),
+              ),
+              child: IconButton(
+                tooltip: 'إعدادات الأذان',
+                icon: const Icon(Icons.settings_rounded, color: Colors.white),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    InstantPageRoute(
+                      builder: (_) => const AdhanSettingsScreen(),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+          Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  'صلاة $nextPrayerName',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 36,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 15),
+                Text(
+                  displayPrayerTime,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 30,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                _CountdownText(nextPrayerTime: nextPrayerTime),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -523,12 +767,16 @@ class _HomeScreenState extends State<HomeScreen> {
         height: 65,
         decoration: BoxDecoration(
           borderRadius: const BorderRadius.all(Radius.circular(20)),
-          boxShadow: [BoxShadow(
-            color: const Color.fromARGB(255, 0, 0, 0).withValues(alpha: .3),
-            blurRadius: 10, offset: const Offset(0, -2))],
+          boxShadow: [
+            BoxShadow(
+                color: const Color.fromARGB(255, 0, 0, 0).withValues(alpha: .3),
+                blurRadius: 10,
+                offset: const Offset(0, -2))
+          ],
         ),
         child: ClipRRect(
-          borderRadius: const BorderRadius.only(topLeft: Radius.circular(20), topRight: Radius.circular(20)),
+          borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(20), topRight: Radius.circular(20)),
           child: BottomNavigationBar(
             type: BottomNavigationBarType.fixed,
             backgroundColor: const Color(0xFF6B8F7F),
@@ -553,8 +801,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   BottomNavigationBarItem _buildNavItem(String iconPath, String label) {
     return BottomNavigationBarItem(
-      icon: Image.asset(iconPath, width: 25, height: 25,
-        errorBuilder: (_, __, ___) => const Icon(Icons.error, size: 24)),
+      icon: Image.asset(iconPath,
+          width: 25,
+          height: 25,
+          errorBuilder: (_, __, ___) => const Icon(Icons.error, size: 24)),
       label: label,
     );
   }
@@ -594,8 +844,8 @@ class _CountdownTextState extends State<_CountdownText> {
     final text = diff.isNegative
         ? 'حان وقت الصلاة'
         : '${diff.inHours.toString().padLeft(2, '0')}:'
-          '${(diff.inMinutes % 60).toString().padLeft(2, '0')}:'
-          '${(diff.inSeconds % 60).toString().padLeft(2, '0')}';
+            '${(diff.inMinutes % 60).toString().padLeft(2, '0')}:'
+            '${(diff.inSeconds % 60).toString().padLeft(2, '0')}';
     if (mounted) setState(() => _text = text);
   }
 
