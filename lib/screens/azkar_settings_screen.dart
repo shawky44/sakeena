@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/azkar_settings_service.dart';
+import '../services/zikr_popup_notification.dart';
 
 class AzkarSettingsScreen extends StatefulWidget {
   const AzkarSettingsScreen({super.key});
@@ -10,10 +11,12 @@ class AzkarSettingsScreen extends StatefulWidget {
 
 class _AzkarSettingsScreenState extends State<AzkarSettingsScreen> {
   final AzkarSettingsService _settingsService = AzkarSettingsService();
-  
+  final ZikrPopupNotification _zikrNotifications = ZikrPopupNotification();
+
   double _fontSize = 22.0;
   Color _cardColor = const Color.fromARGB(240, 230, 237, 205);
-  
+  bool _zikrNotificationsEnabled = false;
+
   final List<Color> _availableColors = [
     const Color.fromARGB(240, 230, 237, 205),
     const Color.fromARGB(240, 205, 230, 237),
@@ -32,10 +35,22 @@ class _AzkarSettingsScreenState extends State<AzkarSettingsScreen> {
   Future<void> _loadSettings() async {
     final fontSize = await _settingsService.getFontSize();
     final cardColor = await _settingsService.getCardColor();
+    final zikrNotificationsEnabled = await _zikrNotifications.isEnabled();
+    if (!mounted) return;
     setState(() {
       _fontSize = fontSize;
       _cardColor = cardColor;
+      _zikrNotificationsEnabled = zikrNotificationsEnabled;
     });
+  }
+
+  Future<void> _setZikrNotificationsEnabled(bool enabled) async {
+    setState(() => _zikrNotificationsEnabled = enabled);
+    if (enabled) {
+      await _zikrNotifications.start(intervalHours: 4);
+    } else {
+      await _zikrNotifications.stop();
+    }
   }
 
   Future<void> _saveFontSize(double size) async {
@@ -88,13 +103,12 @@ class _AzkarSettingsScreenState extends State<AzkarSettingsScreen> {
           children: [
             _buildPreviewCard(),
             const SizedBox(height: 30),
-            
             _buildFontSizeSection(),
             const SizedBox(height: 25),
-            
             _buildColorSection(),
+            const SizedBox(height: 25),
+            _buildNotificationSection(),
             const SizedBox(height: 30),
-            
             _buildResetButton(),
           ],
         ),
@@ -300,6 +314,41 @@ class _AzkarSettingsScreenState extends State<AzkarSettingsScreen> {
             }).toList(),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildNotificationSection() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: .1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: SwitchListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        secondary: const Icon(
+          Icons.notifications_active_rounded,
+          color: Color(0xFF5F7C7A),
+        ),
+        title: const Text(
+          'تذكيرات الذكر',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF2C3E50),
+          ),
+        ),
+        subtitle: const Text('إظهار ذكر مختار كل 4 ساعات'),
+        value: _zikrNotificationsEnabled,
+        activeThumbColor: const Color(0xFF5F7C7A),
+        onChanged: _setZikrNotificationsEnabled,
       ),
     );
   }

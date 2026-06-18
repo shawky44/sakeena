@@ -11,6 +11,10 @@ void zikrAlarmCallback() async {
   debugPrint('🤲 Zikr alarm triggered at ${DateTime.now()}');
 
   final service = ZikrPopupNotification();
+  if (!await service.isEnabled()) {
+    debugPrint('Zikr alarm ignored because notifications are disabled');
+    return;
+  }
   await service.initialize();
   await service.showNow();
 
@@ -205,25 +209,25 @@ class ZikrPopupNotification {
     }
   }
 
-Future<void> _createZikrChannel() async {
-  final android = _notifications
-      .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
-  
-  if (android == null) return;
+  Future<void> _createZikrChannel() async {
+    final android = _notifications.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
 
-  await android.createNotificationChannel(
-    const AndroidNotificationChannel(
-      'zikr_popup_channel',
-      'أذكار منبثقة',
-      description: 'أذكار تظهر على الشاشة بشكل دوري',
-      importance: Importance.high,
-      playSound: true,
-      enableVibration: true,
-      enableLights: true,
-    ),
-  );
-  debugPrint('✅ Zikr channel created');
-}
+    if (android == null) return;
+
+    await android.createNotificationChannel(
+      const AndroidNotificationChannel(
+        'zikr_popup_channel',
+        'أذكار منبثقة',
+        description: 'أذكار تظهر على الشاشة بشكل دوري',
+        importance: Importance.high,
+        playSound: true,
+        enableVibration: true,
+        enableLights: true,
+      ),
+    );
+    debugPrint('✅ Zikr channel created');
+  }
 
   // ✅ بدء الأذكار باستخدام AndroidAlarmManager
   Future<void> start({int intervalHours = 4}) async {
@@ -232,6 +236,7 @@ Future<void> _createZikrChannel() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_zikrEnabledKey, true);
     await prefs.setInt(_zikrIntervalKey, intervalHours);
+    await AndroidAlarmManager.cancel(_zikrAlarmId);
 
     debugPrint(
         '🚀 Starting zikr popup every $intervalHours hours using AlarmManager');
@@ -242,6 +247,7 @@ Future<void> _createZikrChannel() async {
   // ✅ جدولة الذكر القادم
   Future<void> _scheduleNextZikr() async {
     final prefs = await SharedPreferences.getInstance();
+    if (!(prefs.getBool(_zikrEnabledKey) ?? false)) return;
     final intervalHours = prefs.getInt(_zikrIntervalKey) ?? 4;
 
     final nextZikrTime = DateTime.now().add(Duration(hours: intervalHours));
@@ -304,7 +310,7 @@ Future<void> _createZikrChannel() async {
             ledOffMs: 500,
             icon: '@mipmap/ic_launcher',
             autoCancel: true,
-            fullScreenIntent: true,
+            fullScreenIntent: false,
           ),
           iOS: const DarwinNotificationDetails(
             presentAlert: true,

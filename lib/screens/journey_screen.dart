@@ -14,6 +14,7 @@ import '../data/morning_azkar.dart';
 import '../data/evening_azkar.dart';
 import '../data/sleep_azkar.dart';
 import '../screens/azkar_category_screen.dart';
+import '../utils/instant_page_route.dart';
 
 class JourneyScreen extends StatefulWidget {
   const JourneyScreen({super.key});
@@ -27,8 +28,9 @@ class _JourneyScreenState extends State<JourneyScreen>
   JourneyData? _journeyData;
   bool _isLoading = true;
   bool _prayerCelebrationShown = false;
+  bool _showAllPrayers = false;
+  bool _statsExpanded = false;
 
-  // ✅ Stream subscription للـ refresh الفوري
   StreamSubscription? _refreshSub;
 
   Map<String, DateTime?> _prayerDateTimes = {
@@ -55,13 +57,10 @@ class _JourneyScreenState extends State<JourneyScreen>
     _loadData();
     _journeyService.scheduleMidnightReset(_handleMidnightReset);
 
-    // ✅ الحل الرئيسي: استمع للـ stream
-    // أي شاشة تانية (أذكار، azkar_screen) تنادي notifyRefresh() يجي refresh فوري هنا
     _refreshSub = JourneyRefreshService.instance.onRefresh.listen((_) {
       if (mounted) _loadData();
     });
 
-    // refresh كل دقيقة لمواعيد الصلاة
     _prayerRefreshTimer = Timer.periodic(const Duration(minutes: 1), (_) {
       _loadPrayerTimesFromCache();
       if (mounted) setState(() {});
@@ -141,6 +140,12 @@ bool _isPrayerAvailable(String prayerName) {
     final diff = prayerTime.difference(now);
     if (diff.inMinutes < 60) return 'بعد ${diff.inMinutes} د';
     return 'بعد ${diff.inHours}س ${diff.inMinutes % 60}د';
+  }
+
+  String _prayerAvailabilityLabel(String prayerName) {
+    final prayerTime = _prayerDateTimes[prayerName];
+    if (prayerTime == null) return '';
+    return 'تتاح ${DateFormat('h:mm a', 'ar').format(prayerTime)}';
   }
 
   Future<void> _loadData() async {
@@ -314,6 +319,21 @@ bool _isPrayerAvailable(String prayerName) {
     });
   }
 
+  List<MapEntry<String, bool>> _visiblePrayers() {
+    final entries = _journeyData!.prayersCompleted.entries.toList();
+    if (_showAllPrayers || entries.length <= 2) return entries;
+
+    final now = DateTime.now();
+    var currentIndex = entries.indexWhere((entry) {
+      final time = _prayerDateTimes[entry.key];
+      return time != null && time.isAfter(now);
+    });
+    if (currentIndex == -1) currentIndex = entries.length - 1;
+    if (currentIndex > 0) currentIndex--;
+
+    return entries.skip(currentIndex).take(2).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading || _journeyData == null) {
@@ -340,6 +360,9 @@ bool _isPrayerAvailable(String prayerName) {
   Widget _buildHeader() {
     final pct     = _journeyData!.dailyCompletionPercentage;
     final allDone = pct >= 1.0;
+    final completedTasks =
+        _journeyData!.prayersCompleted.values.where((v) => v).length +
+        _journeyData!.azkarProgress.values.where((a) => a.isCompleted).length;
     return SliverToBoxAdapter(
       child: FadeTransition(opacity: _headerAnim,
         child: SlideTransition(
@@ -370,11 +393,11 @@ bool _isPrayerAvailable(String prayerName) {
                   ])),
                 Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
                   AnimatedSwitcher(duration: const Duration(milliseconds: 400),
-                    child: Text(allDone ? 'يوم مكتمل! 🎉' : 'رحلتي اليومية', key: ValueKey(allDone),
+                    child: Text(allDone ? 'يوم مكتمل' : 'رحلتي اليومية', key: ValueKey(allDone),
                       style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white,
                         shadows: [Shadow(color: Colors.black26, offset: Offset(1,2), blurRadius: 4)]))),
                   const SizedBox(height: 2),
-                  Text('تتبع عباداتك اليومية',
+                  Text(allDone ? 'أتممت مهام اليوم' : 'أنجزت $completedTasks من 8 مهام',
                     style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha:.75), fontWeight: FontWeight.w500)),
                 ]),
               ]),
@@ -449,7 +472,22 @@ bool _isPrayerAvailable(String prayerName) {
                 const SizedBox(height: 14),
                 Container(height: 1, color: Colors.white.withValues(alpha:.18)),
                 const SizedBox(height: 10),
-                ...(_journeyData!.prayersCompleted.entries.map((e) => _prayerTile(e.key, e.value))),
+                ...(_visiblePrayers().map((e) => _prayerTile(e.key, e.value))),
+                const SizedBox(height: 2),
+                TextButton.icon(
+                  onPressed: () => setState(() => _showAllPrayers = !_showAllPrayers),
+                  style: TextButton.styleFrom(foregroundColor: Colors.white),
+                  icon: Icon(
+                    _showAllPrayers
+                        ? Icons.keyboard_arrow_up_rounded
+                        : Icons.keyboard_arrow_down_rounded,
+                    size: 20,
+                  ),
+                  label: Text(
+                    _showAllPrayers ? 'عرض أقل' : 'عرض كل الصلوات',
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                  ),
+                ),
               ]),
             ),
           )),
@@ -459,7 +497,7 @@ bool _isPrayerAvailable(String prayerName) {
 
   Widget _prayerTile(String name, bool isDone) {
     final isAvailable = _isPrayerAvailable(name);
-    final timeUntil   = _timeUntilPrayer(name);
+    final availabilityLabel = _prayerAvailabilityLabel(name);
     return GestureDetector(
       onTap: () => _togglePrayer(name),
       child: AnimatedContainer(
@@ -498,11 +536,11 @@ bool _isPrayerAvailable(String prayerName) {
             decoration: isDone ? TextDecoration.lineThrough : null,
             decorationColor: Colors.white54)),
           const Spacer(),
-          if (!isDone && !isAvailable && timeUntil.isNotEmpty)
+          if (!isDone && !isAvailable && availabilityLabel.isNotEmpty)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(color: Colors.white.withValues(alpha:.08), borderRadius: BorderRadius.circular(8)),
-              child: Text(timeUntil, style: TextStyle(color: Colors.white.withValues(alpha:.45), fontSize: 10))),
+              child: Text(availabilityLabel, style: TextStyle(color: Colors.white.withValues(alpha:.45), fontSize: 10))),
           if (isDone) ...[
             const SizedBox(width: 4),
             Icon(Icons.mosque_rounded, color: Colors.white.withValues(alpha:.45), size: 15),
@@ -537,24 +575,7 @@ bool _isPrayerAvailable(String prayerName) {
     final progress = _journeyData!.azkarProgress[type]!;
     final isDone   = progress.isCompleted;
     return GestureDetector(
-      onTap: () async {
-        List<Zikr> list;
-        switch (type) {
-          case 'morning': list = getMorningAzkar(); break;
-          case 'evening': list = getEveningAzkar(); break;
-          default:        list = getSleepAzkar();
-        }
-        await AzkarStorageService.loadAndApplyProgress(type, list);
-        await Navigator.push(context, PageRouteBuilder(
-          pageBuilder: (_, __, ___) => AzkarCategoryScreen(
-            title: title, azkarList: list, themeColor: const Color(0xFF5F7C7A), azkarType: type),
-          transitionsBuilder: (_, anim, __, child) => SlideTransition(
-            position: Tween<Offset>(begin: const Offset(0,0.06), end: Offset.zero)
-                .animate(CurvedAnimation(parent: anim, curve: Curves.easeOutCubic)),
-            child: FadeTransition(opacity: anim, child: child)),
-          transitionDuration: const Duration(milliseconds: 320)));
-        await _loadData();
-      },
+      onTap: () => _openAzkar(type, title),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 350),
         padding: const EdgeInsets.all(16),
@@ -596,6 +617,34 @@ bool _isPrayerAvailable(String prayerName) {
     );
   }
 
+  Future<void> _openAzkar(String type, String title) async {
+    final List<Zikr> list;
+    switch (type) {
+      case 'morning':
+        list = getMorningAzkar();
+        break;
+      case 'evening':
+        list = getEveningAzkar();
+        break;
+      default:
+        list = getSleepAzkar();
+    }
+    await AzkarStorageService.loadAndApplyProgress(type, list);
+    if (!mounted) return;
+    await Navigator.push(
+      context,
+      InstantPageRoute(
+        builder: (_) => AzkarCategoryScreen(
+          title: title,
+          azkarList: list,
+          themeColor: const Color(0xFF5F7C7A),
+          azkarType: type,
+        ),
+      ),
+    );
+    await _loadData();
+  }
+
   Widget _buildStatsSection() {
     final mot   = _motivational();
     final slots = _weekSlots();
@@ -610,21 +659,35 @@ bool _isPrayerAvailable(String prayerName) {
               decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(26),
                 boxShadow: [BoxShadow(color: Colors.black.withValues(alpha:.09), blurRadius: 18, offset: const Offset(0,6))]),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Row(children: [
-                  Container(padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(color: const Color(0xFF5F7C7A).withValues(alpha:.1), borderRadius: BorderRadius.circular(10)),
-                    child: const Icon(Icons.bar_chart_rounded, color: Color(0xFF5F7C7A), size: 20)),
-                  const SizedBox(width: 10),
-                  const Text('الإحصائيات', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF2C3E50))),
-                ]),
+                InkWell(
+                  onTap: () => setState(() => _statsExpanded = !_statsExpanded),
+                  borderRadius: BorderRadius.circular(12),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2),
+                    child: Row(children: [
+                      Container(padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(color: const Color(0xFF5F7C7A).withValues(alpha:.1), borderRadius: BorderRadius.circular(10)),
+                        child: const Icon(Icons.bar_chart_rounded, color: Color(0xFF5F7C7A), size: 20)),
+                      const SizedBox(width: 10),
+                      const Expanded(child: Text('الإحصائيات', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF2C3E50)))),
+                      Text(_statsExpanded ? 'إخفاء التفاصيل' : 'عرض التفاصيل',
+                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF5F7C7A))),
+                      const SizedBox(width: 4),
+                      Icon(_statsExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                        color: const Color(0xFF5F7C7A), size: 21),
+                    ]),
+                  ),
+                ),
                 const SizedBox(height: 16),
                 _motivBanner(mot['msg']!, mot['sub']!),
                 const SizedBox(height: 16),
                 _dailyProgress(data),
-                const SizedBox(height: 16),
-                _heatmap(slots),
-                const SizedBox(height: 16),
-                _statCards(data),
+                if (_statsExpanded) ...[
+                  const SizedBox(height: 16),
+                  _heatmap(slots),
+                  const SizedBox(height: 16),
+                  _statCards(data),
+                ],
               ]),
             )),
         )),
@@ -642,7 +705,19 @@ bool _isPrayerAvailable(String prayerName) {
           begin: Alignment.topLeft, end: Alignment.bottomRight),
         borderRadius: BorderRadius.circular(16)),
       child: Row(children: [
-        Text(active ? '🔥' : '🌱', style: const TextStyle(fontSize: 28)),
+        Container(
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: .14),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(
+            active ? Icons.local_fire_department_rounded : Icons.spa_rounded,
+            color: Colors.white,
+            size: 24,
+          ),
+        ),
         const SizedBox(width: 12),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(msg, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
@@ -671,20 +746,24 @@ bool _isPrayerAvailable(String prayerName) {
             valueColor: AlwaysStoppedAnimation<Color>(pct >= 1.0 ? const Color(0xFF4CAF50) : const Color(0xFF5F7C7A))))),
       const SizedBox(height: 7),
       Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-        _chip('📿 $ca/3 أذكار', ca == 3),
-        _chip('🕌 $cp/5 صلوات', cp == 5),
+        _chip(Icons.auto_awesome_rounded, '$ca/3 أذكار', ca == 3),
+        _chip(Icons.mosque_rounded, '$cp/5 صلوات', cp == 5),
       ]),
     ]);
   }
 
-  Widget _chip(String label, bool done) => Container(
+  Widget _chip(IconData icon, String label, bool done) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
     decoration: BoxDecoration(
       color: done ? const Color(0xFF5F7C7A).withValues(alpha:.1) : Colors.grey.withValues(alpha:.07),
       borderRadius: BorderRadius.circular(20),
       border: Border.all(color: done ? const Color(0xFF5F7C7A).withValues(alpha:.28) : Colors.grey.withValues(alpha:.12))),
-    child: Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600,
-        color: done ? const Color(0xFF5F7C7A) : Colors.grey[500])),
+    child: Row(mainAxisSize: MainAxisSize.min, children: [
+      Icon(icon, size: 13, color: done ? const Color(0xFF5F7C7A) : Colors.grey[500]),
+      const SizedBox(width: 4),
+      Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600,
+          color: done ? const Color(0xFF5F7C7A) : Colors.grey[500])),
+    ]),
   );
 
   Widget _heatmap(List<_WeekSlot> slots) {
@@ -740,19 +819,19 @@ bool _isPrayerAvailable(String prayerName) {
 
   Widget _statCards(JourneyData data) => Column(children: [
     Row(children: [
-      Expanded(child: _card('🔥', data.currentStreak,         'أيام متتالية', const Color(0xFFFF6B6B), 0)),
+      Expanded(child: _card(Icons.local_fire_department_rounded, data.currentStreak, 'أيام متتالية', const Color(0xFFFF6B6B), 0)),
       const SizedBox(width: 10),
-      Expanded(child: _card('🏆', data.longestStreak,         'أطول سلسلة',   const Color(0xFFFFD93D), 1)),
+      Expanded(child: _card(Icons.emoji_events_rounded, data.longestStreak, 'أطول سلسلة', const Color(0xFFE7B52B), 1)),
     ]),
     const SizedBox(height: 10),
     Row(children: [
-      Expanded(child: _card('🕌', data.totalPrayersCompleted, 'صلاة مكتملة',  const Color(0xFF6BCB77), 2)),
+      Expanded(child: _card(Icons.mosque_rounded, data.totalPrayersCompleted, 'صلاة مكتملة', const Color(0xFF6BCB77), 2)),
       const SizedBox(width: 10),
-      Expanded(child: _card('📿', data.totalAzkarCompleted,   'أذكار مكتملة', const Color(0xFF4D96FF), 3)),
+      Expanded(child: _card(Icons.auto_awesome_rounded, data.totalAzkarCompleted, 'أذكار مكتملة', const Color(0xFF4D96FF), 3)),
     ]),
   ]);
 
-  Widget _card(String emoji, int val, String label, Color color, int i) =>
+  Widget _card(IconData icon, int val, String label, Color color, int i) =>
     TweenAnimationBuilder<double>(
       tween: Tween(begin: 0.0, end: 1.0),
       duration: Duration(milliseconds: 600 + i * 100),
@@ -763,7 +842,7 @@ bool _isPrayerAvailable(String prayerName) {
         decoration: BoxDecoration(color: color.withValues(alpha:.08), borderRadius: BorderRadius.circular(16),
           border: Border.all(color: color.withValues(alpha:.22), width: 1.2)),
         child: Column(children: [
-          Text(emoji, style: const TextStyle(fontSize: 26)),
+          Icon(icon, size: 27, color: color),
           const SizedBox(height: 6),
           TweenAnimationBuilder<int>(
             tween: IntTween(begin: 0, end: val),

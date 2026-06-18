@@ -24,9 +24,8 @@ class _QiblaScreenState extends State<QiblaScreen>
   StreamSubscription<CompassEvent>? _compassSubscription;
   bool _compassAvailable = true;
   
-  // للدقة والمعايرة
   final List<double> _headingHistory = [];
-  static const int _historySize = 5; // عدد القراءات للمتوسط
+  static const int _historySize = 5; 
   double _compassAccuracy = 0.0;
   bool _needsCalibration = false;
   int _stableReadings = 0;
@@ -89,7 +88,7 @@ class _QiblaScreenState extends State<QiblaScreen>
 
       Position position = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.best, // أعلى دقة
+          accuracy: LocationAccuracy.best, 
           distanceFilter: 0,
         ),
       );
@@ -164,22 +163,17 @@ class _QiblaScreenState extends State<QiblaScreen>
     final heading = event.heading!;
     final accuracy = event.accuracy ?? 0.0;
 
-    // إضافة القراءة للتاريخ
     _headingHistory.add(heading);
     if (_headingHistory.length > _historySize) {
       _headingHistory.removeAt(0);
     }
 
-    // حساب المتوسط المتحرك (Moving Average) لتقليل الضوضاء
     double smoothedHeading = _calculateSmoothedHeading();
 
-    // اكتشاف التداخل المغناطيسي
     _detectMagneticInterference(heading);
 
-    // تحديد حاجة المعايرة
     _checkCalibrationStatus(accuracy);
 
-    // تحديث القراءة المستقرة
     _updateStableReading(smoothedHeading);
 
     if (mounted) {
@@ -194,8 +188,6 @@ class _QiblaScreenState extends State<QiblaScreen>
     if (_headingHistory.isEmpty) return 0;
     if (_headingHistory.length == 1) return _headingHistory[0];
 
-    // معالجة حالة 0°/360° (الشمال)
-    // نحول الزوايا للتعامل مع الانتقال من 359° إلى 0°
     List<double> adjustedHeadings = [];
     double reference = _headingHistory[0];
 
@@ -210,18 +202,15 @@ class _QiblaScreenState extends State<QiblaScreen>
       }
     }
 
-    // حساب المتوسط
     double sum = adjustedHeadings.reduce((a, b) => a + b);
     double average = sum / adjustedHeadings.length;
 
-    // إرجاع القيمة للنطاق 0-360
     return (average + 360) % 360;
   }
 
   void _detectMagneticInterference(double heading) {
     if (_headingHistory.length < 3) return;
 
-    // حساب التغير السريع في القراءات
     double maxChange = 0;
     for (int i = 1; i < _headingHistory.length; i++) {
       double change = (_headingHistory[i] - _headingHistory[i - 1]).abs();
@@ -229,10 +218,8 @@ class _QiblaScreenState extends State<QiblaScreen>
       if (change > maxChange) maxChange = change;
     }
 
-    // إذا كان التغير أكبر من 30 درجة بين القراءات = تداخل محتمل
     bool hasInterference = maxChange > 30;
 
-    // تحديث حالة التداخل كل 3 ثواني
     final now = DateTime.now();
     if (_lastInterferenceCheck == null ||
         now.difference(_lastInterferenceCheck!).inSeconds >= 3) {
@@ -246,8 +233,6 @@ class _QiblaScreenState extends State<QiblaScreen>
   }
 
   void _checkCalibrationStatus(double accuracy) {
-    // دقة منخفضة = يحتاج معايرة
-    // accuracy: -1 (unknown), 0 (unreliable), 1 (low), 2 (medium), 3 (high)
     bool needsCal = accuracy < 2;
 
     if (mounted && _needsCalibration != needsCal) {
@@ -264,11 +249,9 @@ class _QiblaScreenState extends State<QiblaScreen>
       return;
     }
 
-    // حساب الفرق
     double diff = (heading - _lastStableHeading!).abs();
     if (diff > 180) diff = 360 - diff;
 
-    // إذا كان الفرق أقل من 2 درجة = قراءة مستقرة
     if (diff < 2) {
       _stableReadings++;
     } else {
@@ -289,7 +272,7 @@ class _QiblaScreenState extends State<QiblaScreen>
     
     double diff = (_qiblaDirection! - _currentHeading!).abs();
     diff = diff > 180 ? 360 - diff : diff;
-    return diff < 5; // ضيقنا النطاق لـ 5 درجات للدقة
+    return diff < 5; 
   }
 
   Color get _compassAccuracyColor {
@@ -409,7 +392,6 @@ class _QiblaScreenState extends State<QiblaScreen>
             ),
             const SizedBox(height: 10),
             
-            // مؤشر الحالة الرئيسي
             AnimatedContainer(
               duration: const Duration(milliseconds: 300),
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
@@ -442,7 +424,6 @@ class _QiblaScreenState extends State<QiblaScreen>
 
             const SizedBox(height: 10),
 
-            // شريط دقة البوصلة
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
@@ -470,13 +451,11 @@ class _QiblaScreenState extends State<QiblaScreen>
               ),
             ),
 
-            // تحذير المعايرة
             if (_needsCalibration) ...[
               const SizedBox(height: 10),
               _buildCalibrationWarning(),
             ],
 
-            // تحذير التداخل المغناطيسي
             if (_magneticInterference) ...[
               const SizedBox(height: 10),
               _buildInterferenceWarning(),
@@ -484,7 +463,6 @@ class _QiblaScreenState extends State<QiblaScreen>
 
             const SizedBox(height: 30),
 
-            // البوصلة
             Container(
               width: 300,
               height: 300,
@@ -503,7 +481,6 @@ class _QiblaScreenState extends State<QiblaScreen>
               child: Stack(
                 alignment: Alignment.center,
                 children: [
-                  // الدائرة الخارجية مع علامات الدرجات
                   CustomPaint(
                     size: const Size(300, 300),
                     painter: CompassPainter(
@@ -511,7 +488,6 @@ class _QiblaScreenState extends State<QiblaScreen>
                     ),
                   ),
 
-                  // السهم المشير للقبلة - بدون أنيميشن للدقة
                   Transform.rotate(
                     angle: _qiblaAngle,
                     child: Icon(
@@ -523,7 +499,6 @@ class _QiblaScreenState extends State<QiblaScreen>
                     ),
                   ),
 
-                  // نقطة المركز
                   Container(
                     width: 20,
                     height: 20,
@@ -535,7 +510,6 @@ class _QiblaScreenState extends State<QiblaScreen>
                     ),
                   ),
 
-                  // مؤشر الاستقرار
                   if (_stableReadings >= 3)
                     Positioned(
                       top: 20,
@@ -564,7 +538,6 @@ class _QiblaScreenState extends State<QiblaScreen>
 
             const SizedBox(height: 40),
 
-            // معلومات الموقع والاتجاه
             if (_currentPosition != null && _qiblaDirection != null)
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 32),
@@ -608,7 +581,6 @@ class _QiblaScreenState extends State<QiblaScreen>
 
             const SizedBox(height: 20),
 
-            // إرشادات المعايرة
             _buildCalibrationInstructions(),
 
             const SizedBox(height: 20),
@@ -772,14 +744,12 @@ class CompassPainter extends CustomPainter {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = size.width / 2;
 
-    // رسم الدائرة الخارجية
     final circlePaint = Paint()
       ..color = Colors.grey.shade300
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2;
     canvas.drawCircle(center, radius - 10, circlePaint);
 
-    // رسم علامات الدرجات (كل 10 درجات)
     for (int i = 0; i < 360; i += 10) {
       final angle = (i - heading) * math.pi / 180;
       final startRadius = i % 30 == 0 ? radius - 30 : radius - 20;
@@ -801,7 +771,6 @@ class CompassPainter extends CustomPainter {
       canvas.drawLine(start, end, paint);
     }
 
-    // رسم حروف الاتجاهات
     final labels = ['N', 'E', 'S', 'W'];
     final labelsArabic = ['ش', 'ق', 'ج', 'غ'];
     final angles = [0, 90, 180, 270];

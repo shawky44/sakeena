@@ -7,7 +7,7 @@ class AzkarSettingsService {
   static const String _fontSizeKey = 'azkar_font_size';
   static const String _cardColorKey = 'azkar_card_color';
 
-  static const double defaultFontSize = 24.0;
+  static const double defaultFontSize = 22.0;
   static const Color defaultCardColor = Color.fromARGB(240, 230, 237, 205);
 
   Future<void> saveFontSize(double fontSize) async {

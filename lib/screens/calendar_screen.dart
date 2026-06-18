@@ -23,21 +23,21 @@ class CalendarEvent {
   });
 
   Map<String, dynamic> toJson() => {
-    'title': title,
-    'description': description,
-    'date': date.toIso8601String(),
-    // ignore: deprecated_member_use
-    'color': color.value,
-    'hijriDate': hijriDate,
-  };
+        'title': title,
+        'description': description,
+        'date': date.toIso8601String(),
+        // ignore: deprecated_member_use
+        'color': color.value,
+        'hijriDate': hijriDate,
+      };
 
   factory CalendarEvent.fromJson(Map<String, dynamic> json) => CalendarEvent(
-    title: json['title'],
-    description: json['description'],
-    date: DateTime.parse(json['date']),
-    color: Color(json['color']),
-    hijriDate: json['hijriDate'],
-  );
+        title: json['title'],
+        description: json['description'],
+        date: DateTime.parse(json['date']),
+        color: Color(json['color']),
+        hijriDate: json['hijriDate'],
+      );
 }
 
 class CalendarScreen extends StatefulWidget {
@@ -58,8 +58,16 @@ class _CalendarScreenState extends State<CalendarScreen> {
   final Color backgroundColor = const Color(0xFFD9D9D9);
 
   static const Map<String, String> arabicNumbers = {
-    '0': '٠', '1': '١', '2': '٢', '3': '٣', '4': '٤',
-    '5': '٥', '6': '٦', '7': '٧', '8': '٨', '9': '٩',
+    '0': '٠',
+    '1': '١',
+    '2': '٢',
+    '3': '٣',
+    '4': '٤',
+    '5': '٥',
+    '6': '٦',
+    '7': '٧',
+    '8': '٨',
+    '9': '٩',
   };
 
   @override
@@ -81,19 +89,18 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   Future<void> _loadEvents() async {
     setState(() => _isLoading = true);
-    
+
     try {
       await _loadCachedEvents();
-      
+
       final prefs = await SharedPreferences.getInstance();
       final lastUpdate = prefs.getString('last_calendar_update');
       final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
-      
+
       if (lastUpdate == null || _shouldUpdate(lastUpdate)) {
         await _fetchEventsFromAPI();
         await prefs.setString('last_calendar_update', today);
       }
-      
     } catch (e) {
       _loadDefaultEvents();
     } finally {
@@ -113,33 +120,34 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   Future<void> _fetchEventsFromAPI() async {
     try {
-      
       final currentYear = DateTime.now().year;
       final nextYear = currentYear + 1;
-      
+
       final events = <CalendarEvent>[];
-      
+
       for (var year in [currentYear, nextYear]) {
-        final response = await http.get(
-          Uri.parse('https://api.aladhan.com/v1/gToHCalendar/$year'),
-        ).timeout(const Duration(seconds: 10));
-        
+        final response = await http
+            .get(
+              Uri.parse('https://api.aladhan.com/v1/gToHCalendar/$year'),
+            )
+            .timeout(const Duration(seconds: 10));
+
         if (response.statusCode == 200) {
           final data = json.decode(response.body);
-          
+
           if (data['data'] != null) {
             _processAPIData(data['data'], events, year);
           }
         }
       }
-      
+
       if (events.isNotEmpty) {
         await _saveEventsToCache(events);
-        
+
         _organizeEvents(events);
-        
+
         debugPrint('✅ تم جلب ${events.length} حدث من الإنترنت');
-        
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -149,10 +157,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
           );
         }
       }
-      
     } catch (e) {
       debugPrint('❌ خطأ في جلب البيانات من API: $e');
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -164,19 +171,25 @@ class _CalendarScreenState extends State<CalendarScreen> {
     }
   }
 
-  void _processAPIData(List<dynamic> data, List<CalendarEvent> events, int year) {
-    // البحث عن المناسبات الإسلامية المهمة
+  void _processAPIData(
+      List<dynamic> data, List<CalendarEvent> events, int year) {
     final importantEvents = {
       '1-1': {'title': 'رأس السنة الهجرية', 'color': Colors.blue.shade300},
       '1-10': {'title': 'يوم عاشوراء', 'color': Colors.red.shade300},
       '3-12': {'title': 'المولد النبوي الشريف', 'color': Colors.green.shade300},
-      '7-27': {'title': 'ليلة الإسراء والمعراج', 'color': Colors.purple.shade300},
+      '7-27': {
+        'title': 'ليلة الإسراء والمعراج',
+        'color': Colors.purple.shade300
+      },
       '8-15': {'title': 'ليلة النصف من شعبان', 'color': Colors.indigo.shade300},
       '9-1': {'title': 'أول رمضان', 'color': Colors.teal.shade400},
       '9-27': {'title': 'ليلة القدر', 'color': Colors.deepPurple.shade600},
       '10-1': {'title': 'عيد الفطر المبارك', 'color': Colors.amber.shade400},
       '12-9': {'title': 'يوم عرفة', 'color': Colors.orange.shade500},
-      '12-10': {'title': 'عيد الأضحى المبارك', 'color': Colors.deepOrange.shade400},
+      '12-10': {
+        'title': 'عيد الأضحى المبارك',
+        'color': Colors.deepOrange.shade400
+      },
     };
 
     for (var monthData in data) {
@@ -185,20 +198,22 @@ class _CalendarScreenState extends State<CalendarScreen> {
           try {
             final gregorian = dayData['gregorian'];
             final hijri = dayData['hijri'];
-            
+
             if (gregorian != null && hijri != null) {
               final date = DateFormat('dd-MM-yyyy').parse(gregorian['date']);
               final hijriKey = '${hijri['month']['number']}-${hijri['day']}';
-              
+
               if (importantEvents.containsKey(hijriKey)) {
                 final eventInfo = importantEvents[hijriKey]!;
-                
+
                 events.add(CalendarEvent(
                   title: eventInfo['title'] as String,
-                  description: '${hijri['day']} ${hijri['month']['ar']} ${hijri['year']} هـ',
+                  description:
+                      '${hijri['day']} ${hijri['month']['ar']} ${hijri['year']} هـ',
                   date: date,
                   color: eventInfo['color'] as Color,
-                  hijriDate: '${hijri['day']}-${hijri['month']['number']}-${hijri['year']}',
+                  hijriDate:
+                      '${hijri['day']}-${hijri['month']['number']}-${hijri['year']}',
                 ));
               }
             }
@@ -221,13 +236,14 @@ class _CalendarScreenState extends State<CalendarScreen> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final cachedData = prefs.getString('cached_events');
-      
+
       if (cachedData != null) {
         final List<dynamic> eventsJson = json.decode(cachedData);
-        final events = eventsJson.map((e) => CalendarEvent.fromJson(e)).toList();
-        
+        final events =
+            eventsJson.map((e) => CalendarEvent.fromJson(e)).toList();
+
         _organizeEvents(events);
-        
+
         debugPrint('📦 تم تحميل ${events.length} حدث من الكاش');
       } else {
         _loadDefaultEvents();
@@ -240,29 +256,29 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   void _organizeEvents(List<CalendarEvent> events) {
     _events.clear();
-    
+
     for (var event in events) {
       final normalizedDate = DateTime(
         event.date.year,
         event.date.month,
         event.date.day,
       );
-      
+
       if (_events[normalizedDate] == null) {
         _events[normalizedDate] = [];
       }
       _events[normalizedDate]!.add(event);
     }
-    
+
     if (mounted) setState(() {});
   }
 
   void _loadDefaultEvents() {
     debugPrint('📌 استخدام البيانات الأساسية...');
-    
+
     final currentHijri = HijriCalendar.now();
     final currentYear = currentHijri.hYear;
-    
+
     _addYearEvents(currentYear);
     _addYearEvents(currentYear + 1);
     _addYearEvents(currentYear - 1);
@@ -270,16 +286,76 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   void _addYearEvents(int hijriYear) {
     final List<Map<String, dynamic>> islamicEvents = [
-      {'month': 1, 'day': 1, 'title': 'رأس السنة الهجرية', 'desc': 'بداية العام الهجري $hijriYear', 'color': Colors.blue.shade300},
-      {'month': 1, 'day': 10, 'title': 'يوم عاشوراء', 'desc': 'اليوم الذي نجى الله فيه موسى عليه السلام', 'color': Colors.red.shade300},
-      {'month': 3, 'day': 12, 'title': 'المولد النبوي الشريف', 'desc': 'مولد خير الأنام محمد ﷺ', 'color': Colors.green.shade300},
-      {'month': 7, 'day': 27, 'title': 'ليلة الإسراء والمعراج', 'desc': 'رحلة الإسراء والمعراج المباركة', 'color': Colors.purple.shade300},
-      {'month': 8, 'day': 15, 'title': 'ليلة النصف من شعبان', 'desc': 'ليلة البراءة المباركة', 'color': Colors.indigo.shade300},
-      {'month': 9, 'day': 1, 'title': 'أول رمضان', 'desc': 'بداية شهر رمضان المبارك', 'color': Colors.teal.shade400},
-      {'month': 9, 'day': 27, 'title': 'ليلة القدر', 'desc': 'ليلة خير من ألف شهر', 'color': Colors.deepPurple.shade600},
-      {'month': 10, 'day': 1, 'title': 'عيد الفطر المبارك', 'desc': 'العيد الصغير - أول أيام شوال', 'color': Colors.amber.shade400},
-      {'month': 12, 'day': 9, 'title': 'يوم عرفة', 'desc': 'أفضل أيام السنة - وقوف الحجاج بعرفة', 'color': Colors.orange.shade500},
-      {'month': 12, 'day': 10, 'title': 'عيد الأضحى المبارك', 'desc': 'العيد الكبير - يوم النحر', 'color': Colors.deepOrange.shade400},
+      {
+        'month': 1,
+        'day': 1,
+        'title': 'رأس السنة الهجرية',
+        'desc': 'بداية العام الهجري $hijriYear',
+        'color': Colors.blue.shade300
+      },
+      {
+        'month': 1,
+        'day': 10,
+        'title': 'يوم عاشوراء',
+        'desc': 'اليوم الذي نجى الله فيه موسى عليه السلام',
+        'color': Colors.red.shade300
+      },
+      {
+        'month': 3,
+        'day': 12,
+        'title': 'المولد النبوي الشريف',
+        'desc': 'مولد خير الأنام محمد ﷺ',
+        'color': Colors.green.shade300
+      },
+      {
+        'month': 7,
+        'day': 27,
+        'title': 'ليلة الإسراء والمعراج',
+        'desc': 'رحلة الإسراء والمعراج المباركة',
+        'color': Colors.purple.shade300
+      },
+      {
+        'month': 8,
+        'day': 15,
+        'title': 'ليلة النصف من شعبان',
+        'desc': 'ليلة البراءة المباركة',
+        'color': Colors.indigo.shade300
+      },
+      {
+        'month': 9,
+        'day': 1,
+        'title': 'أول رمضان',
+        'desc': 'بداية شهر رمضان المبارك',
+        'color': Colors.teal.shade400
+      },
+      {
+        'month': 9,
+        'day': 27,
+        'title': 'ليلة القدر',
+        'desc': 'ليلة خير من ألف شهر',
+        'color': Colors.deepPurple.shade600
+      },
+      {
+        'month': 10,
+        'day': 1,
+        'title': 'عيد الفطر المبارك',
+        'desc': 'العيد الصغير - أول أيام شوال',
+        'color': Colors.amber.shade400
+      },
+      {
+        'month': 12,
+        'day': 9,
+        'title': 'يوم عرفة',
+        'desc': 'أفضل أيام السنة - وقوف الحجاج بعرفة',
+        'color': Colors.orange.shade500
+      },
+      {
+        'month': 12,
+        'day': 10,
+        'title': 'عيد الأضحى المبارك',
+        'desc': 'العيد الكبير - يوم النحر',
+        'color': Colors.deepOrange.shade400
+      },
     ];
 
     for (var eventData in islamicEvents) {
@@ -288,23 +364,23 @@ class _CalendarScreenState extends State<CalendarScreen> {
         hijriDate.hYear = hijriYear;
         hijriDate.hMonth = eventData['month'] as int;
         hijriDate.hDay = eventData['day'] as int;
-        
+
         final gregorianDate = hijriDate.hijriToGregorian(
           hijriDate.hYear,
           hijriDate.hMonth,
           hijriDate.hDay,
         );
-        
+
         final normalizedDate = DateTime(
           gregorianDate.year,
           gregorianDate.month,
           gregorianDate.day,
         );
-        
+
         if (_events[normalizedDate] == null) {
           _events[normalizedDate] = [];
         }
-        
+
         _events[normalizedDate]!.add(CalendarEvent(
           title: eventData['title'] as String,
           description: eventData['desc'] as String,
@@ -312,12 +388,11 @@ class _CalendarScreenState extends State<CalendarScreen> {
           color: eventData['color'] as Color,
           hijriDate: '${hijriDate.hDay}-${hijriDate.hMonth}-${hijriDate.hYear}',
         ));
-        
       } catch (e) {
         debugPrint('❌ خطأ في إضافة حدث: ${eventData['title']} - $e');
       }
     }
-    
+
     if (mounted) setState(() {});
   }
 
@@ -351,13 +426,24 @@ class _CalendarScreenState extends State<CalendarScreen> {
     7: 'الأحد',
   };
 
+  static const Map<int, String> shortArabicDays = {
+    DateTime.monday: 'اثنين',
+    DateTime.tuesday: 'ثلاثاء',
+    DateTime.wednesday: 'أربعاء',
+    DateTime.thursday: 'خميس',
+    DateTime.friday: 'جمعة',
+    DateTime.saturday: 'سبت',
+    DateTime.sunday: 'أحد',
+  };
+
   String _getHijriDateString(DateTime gregorianDate) {
     try {
       final hijri = HijriCalendar.fromDate(gregorianDate);
       final dayArabic = _toArabicNumbers(hijri.hDay.toString());
-      final monthName = hijriMonthsArabic[hijri.hMonth] ?? hijri.getLongMonthName();
+      final monthName =
+          hijriMonthsArabic[hijri.hMonth] ?? hijri.getLongMonthName();
       final yearArabic = _toArabicNumbers(hijri.hYear.toString());
-      
+
       return '$dayArabic $monthName $yearArabic هـ';
     } catch (e) {
       debugPrint('خطأ في تحويل التاريخ: $e');
@@ -369,18 +455,30 @@ class _CalendarScreenState extends State<CalendarScreen> {
   String _getGregorianDateArabic(DateTime date) {
     try {
       const monthsArabic = [
-        'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
-        'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'
+        'يناير',
+        'فبراير',
+        'مارس',
+        'أبريل',
+        'مايو',
+        'يونيو',
+        'يوليو',
+        'أغسطس',
+        'سبتمبر',
+        'أكتوبر',
+        'نوفمبر',
+        'ديسمبر'
       ];
-      
-      final dayName = arabicDays[date.weekday] ?? DateFormat('EEEE', 'ar').format(date);
+
+      final dayName =
+          arabicDays[date.weekday] ?? DateFormat('EEEE', 'ar').format(date);
       final day = _toArabicNumbers(date.day.toString());
       final month = monthsArabic[date.month - 1];
       final year = _toArabicNumbers(date.year.toString());
-      
+
       return '$dayName، $day $month $year';
     } catch (e) {
-      return _toArabicNumbers(DateFormat('EEEE، d MMMM yyyy', 'ar').format(date));
+      return _toArabicNumbers(
+          DateFormat('EEEE، d MMMM yyyy', 'ar').format(date));
     }
   }
 
@@ -395,6 +493,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final textScale = MediaQuery.textScalerOf(context).scale(1);
+    final daysOfWeekHeight = (24 * textScale).clamp(24.0, 34.0);
+
     return Scaffold(
       backgroundColor: backgroundColor,
       appBar: AppBar(
@@ -406,21 +507,22 @@ class _CalendarScreenState extends State<CalendarScreen> {
         foregroundColor: Colors.white,
         elevation: 0,
         actions: [
-          // ✨ زر التحديث اليدوي
           IconButton(
-            icon: _isLoading 
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Colors.white,
-                  ),
-                )
-              : const Icon(Icons.refresh),
-            onPressed: _isLoading ? null : () async {
-              await _fetchEventsFromAPI();
-            },
+            icon: _isLoading
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Icon(Icons.refresh),
+            onPressed: _isLoading
+                ? null
+                : () async {
+                    await _fetchEventsFromAPI();
+                  },
             tooltip: 'تحديث التقويم',
           ),
         ],
@@ -438,30 +540,31 @@ class _CalendarScreenState extends State<CalendarScreen> {
               lastDay: DateTime.utc(2035, 12, 31),
               focusedDay: _focusedDay,
               calendarFormat: _calendarFormat,
+              availableCalendarFormats: const {
+                CalendarFormat.month: 'شهر',
+                CalendarFormat.twoWeeks: 'أسبوعان',
+                CalendarFormat.week: 'أسبوع',
+              },
               locale: 'ar',
+              daysOfWeekHeight: daysOfWeekHeight,
               selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
-              
               onDaySelected: (selectedDay, focusedDay) {
                 setState(() {
                   _selectedDay = selectedDay;
                   _focusedDay = focusedDay;
                 });
               },
-              
               onFormatChanged: (format) {
                 setState(() {
                   _calendarFormat = format;
                 });
               },
-              
               onPageChanged: (focusedDay) {
                 setState(() {
                   _focusedDay = focusedDay;
                 });
               },
-              
               eventLoader: _getEventsForDay,
-              
               calendarStyle: CalendarStyle(
                 todayDecoration: BoxDecoration(
                   color: primaryColor.withValues(alpha: .5),
@@ -471,7 +574,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
                 ),
-                
                 selectedDecoration: BoxDecoration(
                   color: primaryColor,
                   shape: BoxShape.circle,
@@ -480,22 +582,17 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
                 ),
-                
                 defaultTextStyle: const TextStyle(
                   fontWeight: FontWeight.w500,
                 ),
-                
                 outsideDaysVisible: false,
-                
                 markersMaxCount: 3,
                 markerDecoration: const BoxDecoration(
-                  // color: const Color.fromARGB(255, 0, 0, 0),
                   shape: BoxShape.circle,
                 ),
                 markersAlignment: Alignment.bottomCenter,
                 markerMargin: const EdgeInsets.symmetric(horizontal: 1),
               ),
-              
               headerStyle: HeaderStyle(
                 titleCentered: true,
                 formatButtonVisible: true,
@@ -512,9 +609,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   fontWeight: FontWeight.bold,
                 ),
                 leftChevronIcon: Icon(Icons.chevron_left, color: primaryColor),
-                rightChevronIcon: Icon(Icons.chevron_right, color: primaryColor),
+                rightChevronIcon:
+                    Icon(Icons.chevron_right, color: primaryColor),
               ),
-              
               daysOfWeekStyle: const DaysOfWeekStyle(
                 weekdayStyle: TextStyle(
                   fontWeight: FontWeight.bold,
@@ -525,17 +622,36 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   color: Colors.black,
                 ),
               ),
-              
               calendarBuilders: CalendarBuilders(
+                dowBuilder: (context, day) {
+                  final label = shortArabicDays[day.weekday] ?? '';
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 2),
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          label,
+                          maxLines: 1,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
                 defaultBuilder: (context, day, focusedDay) {
                   final events = _getEventsForDay(day);
                   final hijriDay = _getShortHijriDay(day);
-                  
+
                   return Container(
                     margin: const EdgeInsets.all(4),
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: events.isNotEmpty 
+                      color: events.isNotEmpty
                           ? events.first.color.withValues(alpha: .2)
                           : null,
                     ),
@@ -551,7 +667,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
                             ),
                           ),
                         ),
-                        
                         if (hijriDay.isNotEmpty)
                           Positioned(
                             bottom: 2,
@@ -565,7 +680,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
                               ),
                             ),
                           ),
-                        
                         if (events.isNotEmpty)
                           Positioned(
                             bottom: 4,
@@ -586,7 +700,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
               ),
             ),
           ),
-          
           if (_selectedDay != null) ...[
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -600,9 +713,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 child: Column(
                   children: [
                     Text(
-                      _toArabicNumbers(
-                        DateFormat('EEEE، d MMMM yyyy', 'ar').format(_selectedDay!)
-                      ),
+                      _toArabicNumbers(DateFormat('EEEE، d MMMM yyyy', 'ar')
+                          .format(_selectedDay!)),
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -623,7 +735,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 ),
               ),
             ),
-            
             Expanded(
               child: _buildEventsList(),
             ),
@@ -635,9 +746,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   Widget _buildEventsList() {
     if (_selectedDay == null) return const SizedBox.shrink();
-    
+
     final events = _getEventsForDay(_selectedDay!);
-    
+
     if (events.isEmpty) {
       return Center(
         child: Column(
@@ -660,7 +771,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
         ),
       );
     }
-    
+
     return ListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: events.length,

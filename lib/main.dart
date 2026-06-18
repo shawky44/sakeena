@@ -4,7 +4,7 @@ import 'package:azkar_app/screens/splash_screen.dart';
 import 'package:azkar_app/services/background_service.dart';
 import 'package:azkar_app/services/prayer_notification_service.dart';
 import 'package:azkar_app/services/zikr_popup_notification.dart';
-import 'package:azkar_app/services/update_service.dart'; 
+import 'package:azkar_app/services/update_service.dart';
 import 'package:device_preview/device_preview.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -13,10 +13,10 @@ import 'package:intl/date_symbol_data_local.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   await initializeDateFormatting('ar', null);
   await initializeDateFormatting('en_US', null);
-  
+
   await AndroidAlarmManager.initialize();
 
   await PrayerNotificationService().ensureInitialized();
@@ -24,7 +24,7 @@ void main() async {
 
   final backgroundService = PrayerBackgroundService();
   await backgroundService.scheduleNextDayRefresh();
-  
+
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
@@ -53,6 +53,7 @@ class AzkArpp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      // ignore: deprecated_member_use
       useInheritedMediaQuery: true,
       locale: DevicePreview.locale(context),
       builder: DevicePreview.appBuilder,
@@ -69,23 +70,52 @@ class AzkArpp extends StatelessWidget {
       ],
       theme: ThemeData(
         primaryColor: const Color(0xFF5F7C7A),
+        scaffoldBackgroundColor: const Color(0xFFF1E8D8),
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(0xFF5F7C7A),
+          surface: const Color(0xFFF1E8D8),
+        ),
+        pageTransitionsTheme: const PageTransitionsTheme(
+          builders: {
+            TargetPlatform.android: _NoPageTransitionsBuilder(),
+            TargetPlatform.iOS: _NoPageTransitionsBuilder(),
+            TargetPlatform.macOS: _NoPageTransitionsBuilder(),
+            TargetPlatform.windows: _NoPageTransitionsBuilder(),
+            TargetPlatform.linux: _NoPageTransitionsBuilder(),
+            TargetPlatform.fuchsia: _NoPageTransitionsBuilder(),
+          },
         ),
         useMaterial3: true,
       ),
       initialRoute: '/',
       routes: {
-        '/': (context) => SplashWrapper(),
+        '/': (context) => const SplashWrapper(),
         '/home': (context) => const HomeScreen(),
       },
     );
   }
 }
 
-class SplashWrapper extends StatefulWidget {
+class _NoPageTransitionsBuilder extends PageTransitionsBuilder {
+  const _NoPageTransitionsBuilder();
+
   @override
-  _SplashWrapperState createState() => _SplashWrapperState();
+  Widget buildTransitions<T>(
+    PageRoute<T> route,
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    return child;
+  }
+}
+
+class SplashWrapper extends StatefulWidget {
+  const SplashWrapper({super.key});
+
+  @override
+  State<SplashWrapper> createState() => _SplashWrapperState();
 }
 
 class _SplashWrapperState extends State<SplashWrapper> {

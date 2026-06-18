@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import '../models/hadith_model.dart';
 import '../data/hadith_data.dart';
+import '../utils/instant_page_route.dart';
 import 'hadith_detail_screen.dart';
 
 class ArbaeenScreen extends StatefulWidget {
@@ -208,7 +209,7 @@ class _ArbaeenScreenState extends State<ArbaeenScreen> {
           onTap: () {
             Navigator.push(
               context,
-              MaterialPageRoute(
+              InstantPageRoute(
                 builder: (context) => HadithDetailScreen(hadith: hadith),
               ),
             );

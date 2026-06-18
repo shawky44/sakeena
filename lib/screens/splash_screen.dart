@@ -81,7 +81,6 @@ class _SplashScreenState extends State<SplashScreen>
                 children: [
                   const Spacer(flex: 2),
 
-                  // اللوجو أو الصورة
                   FadeTransition(
                     opacity: _fadeAnimation,
                     child: Container(
@@ -100,9 +99,8 @@ class _SplashScreenState extends State<SplashScreen>
                       //   ],
                       // ),
                       child: Image.asset(
-                        'assets/images/logo.png', // ضع مسار الصورة هنا
+                        'assets/images/logo.png',
                         errorBuilder: (context, error, stackTrace) {
-                          // لو الصورة مش موجودة، اعرض أيقونة
                           return const Icon(
                             Icons.mosque_rounded,
                             size: 100,
@@ -115,7 +113,6 @@ class _SplashScreenState extends State<SplashScreen>
 
                   const SizedBox(height: 50),
 
-                  // النصوص
                   SlideTransition(
                     position: _slideAnimation,
                     child: FadeTransition(
