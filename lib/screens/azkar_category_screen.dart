@@ -272,6 +272,7 @@ class _AzkarCategoryScreenState extends State<AzkarCategoryScreen> {
                   ? ReorderableListView.builder(
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       itemCount: widget.azkarList.length,
+                      // ignore: deprecated_member_use
                       onReorder: (o, n) {
                         widget.onReorder?.call(o, n);
                         setState(() {});

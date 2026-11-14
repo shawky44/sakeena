@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../services/background_service.dart';
 import '../services/prayer_notification_service.dart';
+import '../services/zikr_popup_notification.dart';
 
 class AdhanSettingsScreen extends StatefulWidget {
   const AdhanSettingsScreen({super.key});
@@ -12,11 +13,13 @@ class AdhanSettingsScreen extends StatefulWidget {
 
 class _AdhanSettingsScreenState extends State<AdhanSettingsScreen> {
   final PrayerNotificationService _service = PrayerNotificationService();
+  final ZikrPopupNotification _zikrNotifications = ZikrPopupNotification();
 
   bool _adhanEnabled = true;
   bool _shortAdhan = false;
   bool _canScheduleExact = true;
   bool _loading = true;
+  bool _zikrNotificationsEnabled = true;
   final Map<String, bool> _enabledPrayers = {};
 
   @override
@@ -30,6 +33,7 @@ class _AdhanSettingsScreenState extends State<AdhanSettingsScreen> {
     final adhanEnabled = await _service.isAdhanEnabled();
     final shortAdhan = await _service.isShortAdhanEnabled();
     final canScheduleExact = await _service.canScheduleExactAlarms();
+    final zikrNotificationsEnabled = await _zikrNotifications.isEnabled();
     final enabledPrayers = <String, bool>{};
     for (final key in prayerNamesEng) {
       enabledPrayers[key] = await _service.isPrayerEnabled(key);
@@ -40,6 +44,7 @@ class _AdhanSettingsScreenState extends State<AdhanSettingsScreen> {
       _adhanEnabled = adhanEnabled;
       _shortAdhan = shortAdhan;
       _canScheduleExact = canScheduleExact;
+      _zikrNotificationsEnabled = zikrNotificationsEnabled;
       _enabledPrayers
         ..clear()
         ..addAll(enabledPrayers);
@@ -48,10 +53,14 @@ class _AdhanSettingsScreenState extends State<AdhanSettingsScreen> {
   }
 
   Future<void> _setAdhanEnabled(bool value) async {
-    await _service.setAdhanEnabled(value);
-    await _reschedule();
-    if (!mounted) return;
     setState(() => _adhanEnabled = value);
+    try {
+      await _service.setAdhanEnabled(value);
+      await _reschedule();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _adhanEnabled = !value);
+    }
   }
 
   Future<void> _setShortAdhan(bool value) async {
@@ -68,8 +77,24 @@ class _AdhanSettingsScreenState extends State<AdhanSettingsScreen> {
     setState(() => _enabledPrayers[key] = value);
   }
 
+  // ✅ تذكيرات الذكر: تشغيل/إيقاف فقط، والفاصل ثابت (كل 3 ساعات)
+  Future<void> _setZikrNotificationsEnabled(bool enabled) async {
+    setState(() => _zikrNotificationsEnabled = enabled);
+    try {
+      if (enabled) {
+        await _zikrNotifications.start();
+      } else {
+        await _zikrNotifications.stop();
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _zikrNotificationsEnabled = !enabled);
+    }
+  }
+
   Future<void> _reschedule() async {
-    await PrayerBackgroundService().scheduleDailyPrayers();
+    await PrayerBackgroundService()
+        .scheduleDailyPrayers(refreshLocation: false);
   }
 
   Future<void> _openExactAlarmSettings() async {
@@ -82,14 +107,6 @@ class _AdhanSettingsScreenState extends State<AdhanSettingsScreen> {
 
   Future<void> _requestBatteryOptimizationExemption() async {
     await _service.requestBatteryOptimizationExemption();
-  }
-
-  Future<void> _stopAdhan() async {
-    await _service.stopAdhan();
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('تم إيقاف الأذان')),
-    );
   }
 
   @override
@@ -141,28 +158,11 @@ class _AdhanSettingsScreenState extends State<AdhanSettingsScreen> {
                     );
                   }),
                   const SizedBox(height: 14),
+                  _sectionTitle('تذكيرات الذكر'),
+                  _zikrPanel(),
+                  const SizedBox(height: 14),
                   _sectionTitle('صلاحيات وتشخيص'),
-                  _permissionTile(),
-                  _actionTile(
-                    icon: Icons.tune_rounded,
-                    title: 'إعدادات صوت الأذان في النظام',
-                    subtitle:
-                        'افتح قناة الإشعار لو الصوت مقفول من إعدادات Android',
-                    onTap: _openNotificationSettings,
-                  ),
-                  _actionTile(
-                    icon: Icons.battery_saver_rounded,
-                    title: 'السماح بعمل الأذان في الخلفية',
-                    subtitle:
-                        'افتح إعدادات البطارية واسمح للتطبيق بالعمل بدون تقييد.',
-                    onTap: _requestBatteryOptimizationExemption,
-                  ),
-                  _actionTile(
-                    icon: Icons.stop_circle_rounded,
-                    title: 'إيقاف الأذان الآن',
-                    subtitle: 'يوقف الصوت الحالي لو كان يعمل',
-                    onTap: _stopAdhan,
-                  ),
+                  _diagnosticsPanel(),
                 ],
               ),
       ),
@@ -258,36 +258,90 @@ class _AdhanSettingsScreenState extends State<AdhanSettingsScreen> {
     );
   }
 
-  Widget _permissionTile() {
-    return _actionTile(
-      icon: _canScheduleExact
-          ? Icons.verified_rounded
-          : Icons.warning_amber_rounded,
-      title: _canScheduleExact
-          ? 'صلاحية المنبه الدقيق مفعلة'
-          : 'صلاحية المنبه الدقيق غير مفعلة',
-      subtitle: _canScheduleExact
-          ? 'الأذان قادر على العمل في الموعد المحدد.'
-          : 'افتح الإعدادات وفعل السماح بالمنبهات الدقيقة.',
-      onTap: _canScheduleExact ? _load : _openExactAlarmSettings,
+  // 🕋 كارت تذكيرات الذكر: سويتش واحد، الفاصل ثابت كل 3 ساعات
+  Widget _zikrPanel() {
+    return _settingsShell(
+      child: SwitchListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        secondary: const Icon(
+          Icons.self_improvement_rounded,
+          color: Color(0xFF5F7C7A),
+        ),
+        title: const Text(
+          'تذكيرات الذكر',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        subtitle: const Text('إظهار ذكر من الأذكار المحفوظة كل 3 ساعات'),
+        value: _zikrNotificationsEnabled,
+        activeThumbColor: const Color(0xFF5F7C7A),
+        onChanged: _setZikrNotificationsEnabled,
+      ),
     );
   }
 
-  Widget _actionTile({
+  // 🔧 بانل مضغوط لصلاحيات وتشخيص (بدون إيقاف الأذان الآن)
+  Widget _diagnosticsPanel() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: .85),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: .05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          _compactTile(
+            icon: _canScheduleExact
+                ? Icons.verified_rounded
+                : Icons.warning_amber_rounded,
+            iconColor: _canScheduleExact
+                ? const Color(0xFF5F7C7A)
+                : Colors.orange.shade700,
+            title: _canScheduleExact
+                ? 'صلاحية المنبه الدقيق مفعلة'
+                : 'صلاحية المنبه الدقيق غير مفعلة',
+            onTap: _canScheduleExact ? _load : _openExactAlarmSettings,
+          ),
+          const Divider(height: 1, indent: 44, endIndent: 12),
+          _compactTile(
+            icon: Icons.tune_rounded,
+            title: 'إعدادات صوت الأذان في النظام',
+            onTap: _openNotificationSettings,
+          ),
+          const Divider(height: 1, indent: 44, endIndent: 12),
+          _compactTile(
+            icon: Icons.battery_saver_rounded,
+            title: 'السماح بعمل الأذان في الخلفية',
+            onTap: _requestBatteryOptimizationExemption,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _compactTile({
     required IconData icon,
+    Color? iconColor,
     required String title,
-    required String subtitle,
     required VoidCallback onTap,
   }) {
-    return _settingsShell(
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-        leading: Icon(icon, color: const Color(0xFF5F7C7A)),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text(subtitle),
-        trailing: const Icon(Icons.chevron_left_rounded),
-        onTap: onTap,
+    return ListTile(
+      dense: true,
+      visualDensity: VisualDensity.compact,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+      leading: Icon(icon, size: 20, color: iconColor ?? const Color(0xFF5F7C7A)),
+      title: Text(
+        title,
+        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
       ),
+      trailing: const Icon(Icons.chevron_left_rounded, size: 18),
+      onTap: onTap,
     );
   }
 

@@ -250,86 +250,96 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _refreshPrayerDataInBackground() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final lastUpdate = prefs.getString('last_prayer_update');
-      final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final lastUpdate = prefs.getString('last_prayer_update');
+    final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
 
-      if (lastUpdate == today && _cachedLat != null && _cachedLon != null) {
-        await _calculateAndSetPrayer(_cachedLat!, _cachedLon!, _currentCountry);
-        await _scheduleNotificationsWithPosition(
-          _cachedLat!,
-          _cachedLon!,
-          _currentCountry,
-        );
-        _startPrayerRefreshTimer();
-        _scheduleDailyNotificationRefresh(
-          _cachedLat!,
-          _cachedLon!,
-          _currentCountry,
-        );
-        debugPrint(
-            '✅ Prayer times are up to date and alarms were re-registered');
-        return;
-      }
-
-      final pos = await _determinePosition();
-      final country = await _getLocationName(pos);
-      _currentCountry = country;
-
-      await _saveCachedLocation(pos.latitude, pos.longitude, country);
-      _cachedLat = pos.latitude;
-      _cachedLon = pos.longitude;
-
-      await _calculateAndSetPrayer(pos.latitude, pos.longitude, country);
+    if (lastUpdate == today && _cachedLat != null && _cachedLon != null) {
+      await _calculateAndSetPrayer(_cachedLat!, _cachedLon!, _currentCountry);
       await _scheduleNotificationsWithPosition(
-          pos.latitude, pos.longitude, country);
-      await prefs.setString('last_prayer_update', today);
-
+        _cachedLat!,
+        _cachedLon!,
+        _currentCountry,
+      );
       _startPrayerRefreshTimer();
-
-      _scheduleDailyNotificationRefresh(pos.latitude, pos.longitude, country);
-      debugPrint('✅ Prayer data refreshed in background');
-    } catch (e) {
-      debugPrint('Background refresh error: $e');
-      if (_cachedLat == null || _cachedLon == null) {
-        await _calculateAndSetPrayer(30.0444, 31.2357, 'Egypt');
-        await _scheduleNotificationsWithPosition(30.0444, 31.2357, 'Egypt');
-      }
+      _scheduleDailyNotificationRefresh(
+        _cachedLat!,
+        _cachedLon!,
+        _currentCountry,
+      );
+      debugPrint(
+          '✅ Prayer times are up to date and alarms were re-registered');
+      return;
     }
-  }
 
-  Future<void> _initPrayerLogic() async {
-    try {
-      final pos = await _determinePosition();
-      final country = await _getLocationName(pos);
+    final pos = await _determinePosition();
+    final country = await _getLocationName(pos);
+    // ✅ لو فشل تحديد الدولة (رجّعت null)، سيب _currentCountry على القيمة
+    // الصحيحة القديمة اللي جاية من الكاش، ولا تستبدلها بـ null
+    if (country != null) {
       _currentCountry = country;
+    }
 
-      await _saveCachedLocation(pos.latitude, pos.longitude, country);
-      _cachedLat = pos.latitude;
-      _cachedLon = pos.longitude;
+    await _saveCachedLocation(pos.latitude, pos.longitude, _currentCountry);
+    _cachedLat = pos.latitude;
+    _cachedLon = pos.longitude;
 
-      await _calculateAndSetPrayer(pos.latitude, pos.longitude, country);
-      await _scheduleNotificationsWithPosition(
-          pos.latitude, pos.longitude, country);
+    await _calculateAndSetPrayer(pos.latitude, pos.longitude, _currentCountry);
+    await _scheduleNotificationsWithPosition(
+        pos.latitude, pos.longitude, _currentCountry);
+    await prefs.setString('last_prayer_update', today);
 
-      _startPrayerRefreshTimer();
+    _startPrayerRefreshTimer();
 
-      _scheduleDailyNotificationRefresh(pos.latitude, pos.longitude, country);
-    } catch (e) {
-      debugPrint('Prayer init error: $e');
+    _scheduleDailyNotificationRefresh(
+        pos.latitude, pos.longitude, _currentCountry);
+    debugPrint('✅ Prayer data refreshed in background');
+  } catch (e) {
+    debugPrint('Background refresh error: $e');
+    if (_cachedLat == null || _cachedLon == null) {
       await _calculateAndSetPrayer(30.0444, 31.2357, 'Egypt');
       await _scheduleNotificationsWithPosition(30.0444, 31.2357, 'Egypt');
     }
   }
+}
 
-  Future<void> _saveCachedLocation(
-      double lat, double lon, String? country) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setDouble('cached_lat', lat);
-    await prefs.setDouble('cached_lon', lon);
-    if (country != null) await prefs.setString('cached_country', country);
+  Future<void> _initPrayerLogic() async {
+  try {
+    final pos = await _determinePosition();
+    final country = await _getLocationName(pos);
+    // ✅ نفس التعديل هنا
+    if (country != null) {
+      _currentCountry = country;
+    }
+
+    await _saveCachedLocation(pos.latitude, pos.longitude, _currentCountry);
+    _cachedLat = pos.latitude;
+    _cachedLon = pos.longitude;
+
+    await _calculateAndSetPrayer(pos.latitude, pos.longitude, _currentCountry);
+    await _scheduleNotificationsWithPosition(
+        pos.latitude, pos.longitude, _currentCountry);
+
+    _startPrayerRefreshTimer();
+
+    _scheduleDailyNotificationRefresh(
+        pos.latitude, pos.longitude, _currentCountry);
+  } catch (e) {
+    debugPrint('Prayer init error: $e');
+    await _calculateAndSetPrayer(30.0444, 31.2357, 'Egypt');
+    await _scheduleNotificationsWithPosition(30.0444, 31.2357, 'Egypt');
   }
+}
+Future<void> _saveCachedLocation(
+    double lat, double lon, String? country) async {
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setDouble('cached_lat', lat);
+  await prefs.setDouble('cached_lon', lon);
+  if (country != null && country.isNotEmpty) {
+    await prefs.setString('cached_country', country);
+  }
+}
 
   void _startPrayerRefreshTimer() {
     _refreshPrayerTimer?.cancel();
@@ -540,30 +550,35 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             accuracy: LocationAccuracy.high, distanceFilter: 0));
   }
 
-  Future<String?> _getLocationName(Position pos) async {
-    try {
-      final placemarks =
-          await geo.placemarkFromCoordinates(pos.latitude, pos.longitude);
-      if (placemarks.isNotEmpty) {
-        final place = placemarks.first;
-        final country = place.country ?? '';
-        if (mounted) {
-          setState(() {
-            userLocation =
-                '${place.locality ?? place.subAdministrativeArea ?? 'موقعك'} - $country';
-          });
-          SharedPreferences.getInstance().then((prefs) {
-            prefs.setString('cached_location', userLocation);
-          });
-        }
-        return country;
+Future<String?> _getLocationName(Position pos) async {
+  try {
+    final placemarks =
+        await geo.placemarkFromCoordinates(pos.latitude, pos.longitude);
+    if (placemarks.isNotEmpty) {
+      final place = placemarks.first;
+      final rawCountry = place.country?.trim();
+      // ✅ خليها ترجع null صراحة لو الدولة فاضية أو غير موجودة،
+      // مش سلسلة فاضية '' اللي ممكن "تفوت" من فحص != null
+      final country =
+          (rawCountry != null && rawCountry.isNotEmpty) ? rawCountry : null;
+
+      if (mounted) {
+        setState(() {
+          userLocation =
+              '${place.locality ?? place.subAdministrativeArea ?? 'موقعك'} - ${country ?? ''}';
+        });
+        SharedPreferences.getInstance().then((prefs) {
+          prefs.setString('cached_location', userLocation);
+        });
       }
-    } catch (e) {
-      debugPrint('Location name error: $e');
-      if (mounted) setState(() => userLocation = 'الموقع غير معروف');
+      return country;
     }
-    return null;
+  } catch (e) {
+    debugPrint('Location name error: $e');
+    if (mounted) setState(() => userLocation = 'الموقع غير معروف');
   }
+  return null;
+}
 
   void _scheduleDailyNotificationRefresh(
       double latitude, double longitude, String? country) {
@@ -571,55 +586,64 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final nextMidnight = DateTime(now.year, now.month, now.day + 1);
     final durationUntilMidnight = nextMidnight.difference(now);
     Timer(durationUntilMidnight, () async {
-      await _calculateAndSetPrayer(latitude, longitude, country);
-      await _scheduleNotificationsWithPosition(latitude, longitude, country);
+      await _calculateAndSetPrayer(latitude, longitude, _currentCountry);
+      await _scheduleNotificationsWithPosition(latitude, longitude, _currentCountry);
       _scheduleDailyNotificationRefresh(latitude, longitude, country);
     });
   }
 
   void _showExitHint() {
-    final messenger = ScaffoldMessenger.of(context);
-    messenger
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          duration: const Duration(seconds: 2),
-          behavior: SnackBarBehavior.floating,
-          elevation: 0,
-          backgroundColor: Colors.transparent,
-          margin: const EdgeInsets.fromLTRB(18, 0, 18, 12),
-          padding: EdgeInsets.zero,
-          content: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-            decoration: BoxDecoration(
-              color: const Color(0xFF3F5E59).withValues(alpha: .82),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.white.withValues(alpha: .16)),
-            ),
-            child: const Row(
-              children: [
-                Icon(
-                  Icons.logout_rounded,
-                  color: Colors.white,
-                  size: 19,
-                ),
-                SizedBox(width: 9),
-                Expanded(
-                  child: Text(
-                    'اضغط مرة أخرى للخروج',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                    ),
+  final messenger = ScaffoldMessenger.of(context);
+  messenger
+    ..hideCurrentSnackBar()
+    ..showSnackBar(
+      SnackBar(
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+        elevation: 0,
+        backgroundColor: const ui.Color.fromARGB(88, 0, 0, 0),
+        width: 230, // كبسولة بعرض ثابت في نص الشاشة
+        padding: EdgeInsets.zero,
+        shape: const StadiumBorder(),
+        content: Directionality(
+          textDirection: ui.TextDirection.rtl,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(30),
+            child: BackdropFilter(
+              filter: ui.ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+                decoration: BoxDecoration(
+                  color: const ui.Color.fromARGB(179, 47, 69, 66).withValues(alpha: .55),
+                  borderRadius: BorderRadius.circular(30),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: .18),
                   ),
                 ),
-              ],
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.logout_rounded, color: Colors.white, size: 18),
+                    SizedBox(width: 8),
+                    Text(
+                      'اضغط مرة أخرى للخروج',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
         ),
-      );
-  }
+      ),
+    );
+}
 
   @override
   Widget build(BuildContext context) {

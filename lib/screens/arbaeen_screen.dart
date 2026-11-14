@@ -62,9 +62,9 @@ class _ArbaeenScreenState extends State<ArbaeenScreen> {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Color(0xFF2E7D6E),
-              Color(0xFF4A9B8E),
-              Color(0xFF6BB9AD),
+              Color.fromARGB(255, 46, 125, 103),
+              Color.fromARGB(255, 74, 155, 128),
+              Color.fromARGB(255, 107, 185, 159),
             ],
           ),
         ),

@@ -6,6 +6,16 @@ import '../services/storage_service.dart';
 import '../utils/instant_page_route.dart';
 import 'seerah_detail_screen.dart';
 
+// 🎨 ألوان دافئة بطابع ورق الكتب
+const Color _kPaper = Color(0xFFEADBBE);
+const Color _kCard = Color(0xFFF4E8CF);
+const Color _kBorder = Color(0xFFD3C09A);
+const Color _kInk = Color(0xFF3B2F22);
+const Color _kInkSoft = Color(0xFF6F5E47);
+const Color _kGold = Color(0xFF8A6A3B);
+const Color _kGoldSoft = Color(0xFFE3D1AA);
+const Color _kGreen = Color(0xFF4F6F6A);
+
 class SeerahScreen extends StatefulWidget {
   const SeerahScreen({super.key});
 
@@ -13,7 +23,8 @@ class SeerahScreen extends StatefulWidget {
   State<SeerahScreen> createState() => _SeerahScreenState();
 }
 
-class _SeerahScreenState extends State<SeerahScreen> with SingleTickerProviderStateMixin {
+class _SeerahScreenState extends State<SeerahScreen>
+    with SingleTickerProviderStateMixin {
   List<SeerahStory> _filteredStories = [];
   final TextEditingController _searchController = TextEditingController();
   String _selectedCategory = 'الكل';
@@ -33,7 +44,8 @@ class _SeerahScreenState extends State<SeerahScreen> with SingleTickerProviderSt
   Future<void> _loadData() async {
     final favorites = await StorageService.getFavorites();
     final completed = await StorageService.getCompleted();
-    
+
+    if (!mounted) return;
     setState(() {
       _favorites = favorites;
       _completed = completed;
@@ -57,8 +69,8 @@ class _SeerahScreenState extends State<SeerahScreen> with SingleTickerProviderSt
           final matchesSearch = query.isEmpty ||
               story.title.contains(query) ||
               story.subtitle.contains(query);
-          final matchesCategory = _selectedCategory == 'الكل' ||
-              story.category == _selectedCategory;
+          final matchesCategory =
+              _selectedCategory == 'الكل' || story.category == _selectedCategory;
           return matchesSearch && matchesCategory;
         }).toList();
       }
@@ -92,80 +104,105 @@ class _SeerahScreenState extends State<SeerahScreen> with SingleTickerProviderSt
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(
-            color: Color(0xFF159895),
-          ),
-        ),
-      );
-    }
-
-    return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF1A5F7A),
-              Color(0xFF159895),
-              Color(0xFF57C5B6),
-            ],
-          ),
-        ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              _buildHeader(),
-              _buildTabBar(),
-              _buildSearchBar(),
-              _buildCategoryChips(),
-              Expanded(
-                child: TabBarView(
-                  controller: _tabController,
+    // 🔒 Directionality ثابتة على RTL عشان الشكل ميتأثرش بلغة النظام
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: _isLoading
+          ? const Scaffold(
+              backgroundColor: _kPaper,
+              body: Center(child: CircularProgressIndicator(color: _kGold)),
+            )
+          : Scaffold(
+              backgroundColor: _kPaper,
+              body: SafeArea(
+                child: Column(
                   children: [
-                    _buildStoriesList(),
-                    _buildFavoritesList(),
+                    _buildHeader(),
+                    _buildTabBar(),
+                    // 🔽 البحث والتصنيفات بيتحركوا مع إصبعك بالظبط:
+                    // بيطلعوا لما تنزل بالقصص، وبيرجعوا أول ما تسحب لفوق
+                    Expanded(
+                      child: NestedScrollView(
+                        floatHeaderSlivers: true,
+                        headerSliverBuilder: (context, innerBoxIsScrolled) => [
+                          SliverAppBar(
+                            floating: true,
+                            snap: true,
+                            pinned: false,
+                            automaticallyImplyLeading: false,
+                            backgroundColor: _kPaper,
+                            surfaceTintColor: Colors.transparent,
+                            elevation: 0,
+                            scrolledUnderElevation: 0,
+                            toolbarHeight: _collapsibleHeight,
+                            flexibleSpace: ClipRect(
+                              child: OverflowBox(
+                                alignment: Alignment.topCenter,
+                                minHeight: 0,
+                                maxHeight: _collapsibleHeight,
+                                child: SizedBox(
+                                  height: _collapsibleHeight,
+                                  child: Column(
+                                    children: [
+                                      _buildSearchBar(),
+                                      _buildCategoryChips(),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                        body: TabBarView(
+                          controller: _tabController,
+                          children: [
+                            _buildStoriesList(),
+                            _buildFavoritesList(),
+                          ],
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
-            ],
-          ),
-        ),
-      ),
-      floatingActionButton: _buildProgressFAB(),
+              floatingActionButton: _buildProgressFAB(),
+            ),
     );
   }
 
+  // ارتفاع الجزء اللي بيتقفل (بحث 16+50+12 + تصنيفات 42 + مسافة 6)
+  static const double _searchHeight = 50;
+  static const double _chipsHeight = 42;
+  static const double _collapsibleHeight = 16 + _searchHeight + 12 + _chipsHeight + 6;
+
   Widget _buildHeader() {
-    return Container(
-      padding: const EdgeInsets.all(20),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
       child: Row(
         children: [
           IconButton(
-            icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+            icon: const Icon(Icons.arrow_back_ios_new_rounded,
+                color: _kInk, size: 20),
             onPressed: () => Navigator.pop(context),
           ),
+          const SizedBox(width: 4),
           const Expanded(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   'قصص الصحابة والأنبياء',
                   style: TextStyle(
-                    fontSize: 28,
+                    fontSize: 22,
                     fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                    color: _kInk,
                   ),
                 ),
-                SizedBox(height: 4),
-                Text(
-                  'رحلة في حياة خير البشر ﷺ',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.white70,
+                Padding(
+                  padding: EdgeInsets.only(top: 2),
+                  child: Text(
+                    'رحلة في حياة خير البشر ﷺ',
+                    style: TextStyle(fontSize: 13, color: _kInkSoft),
                   ),
                 ),
               ],
@@ -178,57 +215,52 @@ class _SeerahScreenState extends State<SeerahScreen> with SingleTickerProviderSt
 
   Widget _buildTabBar() {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: .2),
-        borderRadius: BorderRadius.circular(25),
+      margin: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: _kBorder, width: 1.2)),
       ),
-        child: TabBar(
+      child: TabBar(
         controller: _tabController,
-        indicatorSize: TabBarIndicatorSize.tab,
-        indicatorPadding: const EdgeInsets.all(3),
-        labelPadding: const EdgeInsets.symmetric(horizontal: 20),
-        indicator: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(25),
-        ),
-        labelColor: const Color(0xFF1A5F7A),
-        unselectedLabelColor: Colors.white,
+        indicatorColor: _kGold,
+        indicatorWeight: 3,
+        indicatorSize: TabBarIndicatorSize.label,
+        labelColor: _kInk,
+        unselectedLabelColor: _kInkSoft,
+        labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+        unselectedLabelStyle: const TextStyle(fontSize: 15),
         dividerColor: Colors.transparent,
+        overlayColor: WidgetStateProperty.all(Colors.transparent),
         tabs: const [
           Tab(text: 'جميع القصص'),
           Tab(text: 'المفضلة'),
         ],
       ),
-
     );
   }
 
   Widget _buildSearchBar() {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+      height: _searchHeight,
+      margin: const EdgeInsets.fromLTRB(20, 16, 20, 12),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(30),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: .1),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
-          ),
-        ],
+        color: _kCard,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _kBorder),
       ),
       child: TextField(
         controller: _searchController,
         textDirection: TextDirection.rtl,
         onChanged: _filterStories,
+        style: const TextStyle(color: _kInk),
+        cursorColor: _kGold,
         decoration: InputDecoration(
           hintText: 'ابحث في القصص...',
+          hintStyle: const TextStyle(color: _kInkSoft, fontSize: 14),
           hintTextDirection: TextDirection.rtl,
-          prefixIcon: const Icon(Icons.search, color: Color(0xFF1A5F7A)),
+          prefixIcon: const Icon(Icons.search_rounded, color: _kGold),
           suffixIcon: _searchController.text.isNotEmpty
               ? IconButton(
-                  icon: const Icon(Icons.clear),
+                  icon: const Icon(Icons.close_rounded, color: _kInkSoft),
                   onPressed: () {
                     _searchController.clear();
                     _filterStories('');
@@ -236,7 +268,8 @@ class _SeerahScreenState extends State<SeerahScreen> with SingleTickerProviderSt
                 )
               : null,
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         ),
       ),
     );
@@ -244,7 +277,7 @@ class _SeerahScreenState extends State<SeerahScreen> with SingleTickerProviderSt
 
   Widget _buildCategoryChips() {
     return SizedBox(
-      height: 50,
+      height: _chipsHeight,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -255,32 +288,22 @@ class _SeerahScreenState extends State<SeerahScreen> with SingleTickerProviderSt
 
           return GestureDetector(
             onTap: () => _selectCategory(category),
-            child: Container(
-              margin: const EdgeInsets.only(left: 10),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              margin: const EdgeInsetsDirectional.only(end: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 18),
+              alignment: Alignment.center,
               decoration: BoxDecoration(
-                gradient: isSelected
-                    ? const LinearGradient(
-                        colors: [Colors.white, Colors.white],
-                      )
-                    : LinearGradient(
-                        colors: [
-                          Colors.white.withValues(alpha: .2),
-                          Colors.white.withValues(alpha: .1),
-                        ],
-                      ),
-                borderRadius: BorderRadius.circular(25),
-                border: Border.all(
-                  color: isSelected ? Colors.white : Colors.white.withValues(alpha: .3),
-                  width: 2,
-                ),
+                color: isSelected ? _kGold : _kCard,
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(color: isSelected ? _kGold : _kBorder),
               ),
               child: Text(
                 category,
                 style: TextStyle(
-                  color: isSelected ? const Color(0xFF1A5F7A) : Colors.white,
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                  fontSize: 14,
+                  color: isSelected ? _kPaper : _kInk,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                  fontSize: 13.5,
                 ),
               ),
             ),
@@ -290,76 +313,59 @@ class _SeerahScreenState extends State<SeerahScreen> with SingleTickerProviderSt
     );
   }
 
+  Widget _buildEmptyState(IconData icon, String title, [String? subtitle]) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 64, color: _kGold.withValues(alpha: .5)),
+          const SizedBox(height: 16),
+          Text(title, style: const TextStyle(fontSize: 18, color: _kInk)),
+          if (subtitle != null) ...[
+            const SizedBox(height: 8),
+            Text(subtitle,
+                style: const TextStyle(fontSize: 13, color: _kInkSoft)),
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget _buildStoriesList() {
     if (_filteredStories.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.search_off, size: 80, color: Colors.white.withValues(alpha: .5)),
-            const SizedBox(height: 20),
-            Text(
-              'لا توجد قصص',
-              style: TextStyle(
-                fontSize: 20,
-                color: Colors.white.withValues(alpha: .7),
-              ),
-            ),
-          ],
-        ),
-      );
+      return _buildEmptyState(Icons.search_off_rounded, 'لا توجد قصص');
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.only(top: 15, bottom: 100),
+      padding: const EdgeInsets.only(top: 14, bottom: 100),
       itemCount: _filteredStories.length,
       itemBuilder: (context, index) {
         final story = _filteredStories[index];
         final isFavorite = _favorites.contains(story.id);
         final isCompleted = _completed.contains(story.id);
-
         return _buildStoryCard(story, isFavorite, isCompleted);
       },
     );
   }
 
   Widget _buildFavoritesList() {
-    final favoriteStories = SeerahData.stories.where((s) => _favorites.contains(s.id)).toList();
+    final favoriteStories =
+        SeerahData.stories.where((s) => _favorites.contains(s.id)).toList();
 
     if (favoriteStories.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.favorite_border, size: 80, color: Colors.white.withValues(alpha: .5)),
-            const SizedBox(height: 20),
-            Text(
-              'لا توجد قصص مفضلة',
-              style: TextStyle(
-                fontSize: 20,
-                color: Colors.white.withValues(alpha: .7),
-              ),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              'اضغط على ♡ لإضافة قصص للمفضلة',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.white.withValues(alpha: .5),
-              ),
-            ),
-          ],
-        ),
+      return _buildEmptyState(
+        Icons.favorite_border_rounded,
+        'لا توجد قصص مفضلة',
+        'اضغط على ♡ لإضافة قصص للمفضلة',
       );
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.only(top: 15, bottom: 100),
+      padding: const EdgeInsets.only(top: 14, bottom: 100),
       itemCount: favoriteStories.length,
       itemBuilder: (context, index) {
         final story = favoriteStories[index];
         final isCompleted = _completed.contains(story.id);
-
         return _buildStoryCard(story, true, isCompleted);
       },
     );
@@ -367,22 +373,18 @@ class _SeerahScreenState extends State<SeerahScreen> with SingleTickerProviderSt
 
   Widget _buildStoryCard(SeerahStory story, bool isFavorite, bool isCompleted) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: .1),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
-          ),
-        ],
+        color: _kCard,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: _kBorder),
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(18),
+          splashColor: _kGoldSoft,
+          highlightColor: _kGoldSoft.withValues(alpha: .5),
           onTap: () async {
             final result = await Navigator.push(
               context,
@@ -394,160 +396,108 @@ class _SeerahScreenState extends State<SeerahScreen> with SingleTickerProviderSt
               _markAsCompleted(story.id);
             }
           },
-          child: Stack(
-            children: [
-              if (isCompleted)
-                Positioned(
-                  top: 15,
-                  left: 15,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: Colors.green,
-                      borderRadius: BorderRadius.circular(15),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.check, color: Colors.white, size: 14),
-                        SizedBox(width: 4),
-                        Text(
-                          'مكتملة',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(8, 14, 14, 14),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // الأيقونة (على اليمين في RTL)
+                Container(
+                  width: 52,
+                  height: 52,
+                  margin: const EdgeInsetsDirectional.only(start: 6, top: 2),
+                  decoration: const BoxDecoration(
+                    color: _kGoldSoft,
+                    shape: BoxShape.circle,
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(story.emoji, style: const TextStyle(fontSize: 26)),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        story.title,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: _kInk,
+                          height: 1.4,
                         ),
-                      ],
-                    ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        story.subtitle,
+                        style: const TextStyle(
+                          fontSize: 13.5,
+                          color: _kInkSoft,
+                          height: 1.5,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 6,
+                        children: [
+                          _buildChip(Icons.menu_book_rounded, story.category,
+                              _kGold),
+                          _buildChip(Icons.location_on_outlined, story.location,
+                              _kGreen),
+                          _buildChip(Icons.schedule_rounded,
+                              '${story.readingMinutes} دقائق', _kInkSoft),
+                          if (isCompleted)
+                            _buildChip(Icons.check_circle_outline_rounded,
+                                'مكتملة', const Color(0xFF4F7A5A)),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
-              
-              Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        IconButton(
-                          icon: Icon(
-                            isFavorite ? Icons.favorite : Icons.favorite_border,
-                            color: isFavorite ? Colors.red : Colors.grey,
-                            size: 28,
-                          ),
-                          onPressed: () => _toggleFavorite(story.id),
-                        ),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.end,
-                                children: [
-                                  Text(
-                                    story.emoji,
-                                    style: const TextStyle(fontSize: 30),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Flexible(
-                                    child: Text(
-                                      story.title,
-                                      textDirection: TextDirection.rtl,
-                                      style: const TextStyle(
-                                        fontSize: 20,
-                                        fontWeight: FontWeight.bold,
-                                        color: Color(0xFF1A5F7A),
-                                      ),
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                story.subtitle,
-                                textDirection: TextDirection.rtl,
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey[600],
-                                ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 15),
-                    const Divider(),
-                    const SizedBox(height: 10),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        _buildInfoChip(
-                          Icons.location_on,
-                          story.location,
-                          const Color(0xFF1A5F7A),
-                        ),
-                        const SizedBox(width: 10),
-                        _buildInfoChip(
-                          Icons.access_time,
-                          '${story.readingMinutes} دقائق',
-                          const Color(0xFF159895),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF57C5B6).withValues(alpha: .2),
-                        borderRadius: BorderRadius.circular(15),
-                      ),
-                      child: Text(
-                        story.category,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF1A5F7A),
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ],
+                IconButton(
+                  visualDensity: VisualDensity.compact,
+                  icon: Icon(
+                    isFavorite
+                        ? Icons.favorite_rounded
+                        : Icons.favorite_border_rounded,
+                    color: isFavorite ? const Color(0xFFB5523B) : _kInkSoft,
+                    size: 24,
+                  ),
+                  onPressed: () => _toggleFavorite(story.id),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildInfoChip(IconData icon, String text, Color color) {
+  Widget _buildChip(IconData icon, String text, Color color) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
       decoration: BoxDecoration(
         color: color.withValues(alpha: .1),
-        borderRadius: BorderRadius.circular(15),
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
+          Icon(icon, size: 13, color: color),
+          const SizedBox(width: 4),
           Text(
             text,
             style: TextStyle(
-              fontSize: 12,
+              fontSize: 11.5,
               color: color,
-              fontWeight: FontWeight.w500,
+              fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(width: 5),
-          Icon(icon, size: 14, color: color),
         ],
       ),
     );
@@ -562,51 +512,67 @@ class _SeerahScreenState extends State<SeerahScreen> with SingleTickerProviderSt
       onPressed: () {
         showDialog(
           context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('إحصائيات التقدم', textDirection: TextDirection.rtl),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  'أكملت $completedCount من $totalCount قصة',
-                  textDirection: TextDirection.rtl,
-                  style: const TextStyle(fontSize: 16),
-                ),
-                const SizedBox(height: 15),
-                LinearProgressIndicator(
-                  value: progress,
-                  backgroundColor: Colors.grey[300],
-                  valueColor: const AlwaysStoppedAnimation(Color(0xFF159895)),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  '${(progress * 100).toStringAsFixed(0)}%',
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF159895),
+          builder: (context) => Directionality(
+            textDirection: TextDirection.rtl,
+            child: AlertDialog(
+              backgroundColor: _kPaper,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+                side: const BorderSide(color: _kBorder),
+              ),
+              title: const Text(
+                'إحصائيات التقدم',
+                style: TextStyle(color: _kInk, fontWeight: FontWeight.bold),
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'أكملت $completedCount من $totalCount قصة',
+                    style: const TextStyle(fontSize: 16, color: _kInk),
                   ),
+                  const SizedBox(height: 16),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: LinearProgressIndicator(
+                      value: progress,
+                      minHeight: 8,
+                      backgroundColor: _kBorder,
+                      valueColor: const AlwaysStoppedAnimation(_kGold),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    '${(progress * 100).toStringAsFixed(0)}%',
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: _kGold,
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('حسناً', style: TextStyle(color: _kGold)),
                 ),
               ],
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('حسناً'),
-              ),
-            ],
           ),
         );
       },
-      backgroundColor: Colors.white,
-      icon: const Icon(Icons.trending_up, color: Color(0xFF1A5F7A)),
+      backgroundColor: _kCard,
+      elevation: 1,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(22),
+        side: const BorderSide(color: _kBorder),
+      ),
+      icon: const Icon(Icons.auto_stories_rounded, color: _kGold),
       label: Text(
         '$completedCount/$totalCount',
-        style: const TextStyle(
-          color: Color(0xFF1A5F7A),
-          fontWeight: FontWeight.bold,
-        ),
+        style: const TextStyle(color: _kInk, fontWeight: FontWeight.bold),
       ),
     );
   }

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../services/azkar_settings_service.dart';
-import '../services/zikr_popup_notification.dart';
 
 class AzkarSettingsScreen extends StatefulWidget {
   const AzkarSettingsScreen({super.key});
@@ -11,20 +10,9 @@ class AzkarSettingsScreen extends StatefulWidget {
 
 class _AzkarSettingsScreenState extends State<AzkarSettingsScreen> {
   final AzkarSettingsService _settingsService = AzkarSettingsService();
-  final ZikrPopupNotification _zikrNotifications = ZikrPopupNotification();
 
-  double _fontSize = 22.0;
+  double _fontSize = 20.0;
   Color _cardColor = const Color.fromARGB(240, 230, 237, 205);
-  bool _zikrNotificationsEnabled = false;
-
-  final List<Color> _availableColors = [
-    const Color.fromARGB(240, 230, 237, 205),
-    const Color.fromARGB(240, 205, 230, 237),
-    const Color.fromARGB(240, 237, 205, 230),
-    const Color.fromARGB(240, 205, 237, 205),
-    const Color.fromARGB(240, 237, 230, 205),
-    const Color.fromARGB(240, 225, 215, 235),
-  ];
 
   @override
   void initState() {
@@ -35,35 +23,17 @@ class _AzkarSettingsScreenState extends State<AzkarSettingsScreen> {
   Future<void> _loadSettings() async {
     final fontSize = await _settingsService.getFontSize();
     final cardColor = await _settingsService.getCardColor();
-    final zikrNotificationsEnabled = await _zikrNotifications.isEnabled();
     if (!mounted) return;
     setState(() {
       _fontSize = fontSize;
       _cardColor = cardColor;
-      _zikrNotificationsEnabled = zikrNotificationsEnabled;
     });
-  }
-
-  Future<void> _setZikrNotificationsEnabled(bool enabled) async {
-    setState(() => _zikrNotificationsEnabled = enabled);
-    if (enabled) {
-      await _zikrNotifications.start(intervalHours: 4);
-    } else {
-      await _zikrNotifications.stop();
-    }
   }
 
   Future<void> _saveFontSize(double size) async {
     await _settingsService.saveFontSize(size);
     setState(() {
       _fontSize = size;
-    });
-  }
-
-  Future<void> _saveCardColor(Color color) async {
-    await _settingsService.saveCardColor(color);
-    setState(() {
-      _cardColor = color;
     });
   }
 
@@ -104,10 +74,6 @@ class _AzkarSettingsScreenState extends State<AzkarSettingsScreen> {
             _buildPreviewCard(),
             const SizedBox(height: 30),
             _buildFontSizeSection(),
-            const SizedBox(height: 25),
-            _buildColorSection(),
-            const SizedBox(height: 25),
-            _buildNotificationSection(),
             const SizedBox(height: 30),
             _buildResetButton(),
           ],
@@ -211,9 +177,9 @@ class _AzkarSettingsScreenState extends State<AzkarSettingsScreen> {
               Expanded(
                 child: Slider(
                   value: _fontSize,
-                  min: 18.0,
+                  min: 14.0,
                   max: 32.0,
-                  divisions: 7,
+                  divisions: 18,
                   activeColor: const Color(0xFF5F7C7A),
                   inactiveColor: const Color(0xFF5F7C7A).withValues(alpha: .3),
                   onChanged: (value) {
@@ -242,136 +208,62 @@ class _AzkarSettingsScreenState extends State<AzkarSettingsScreen> {
     );
   }
 
-  Widget _buildColorSection() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: .1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Row(
-            children: [
-              Icon(Icons.palette, color: Color(0xFF5F7C7A)),
-              SizedBox(width: 12),
-              Text(
-                'لون الكارت',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF2C3E50),
-                ),
+  // 🎨 زرار استعادة الإعدادات الافتراضية بشكل أشيك
+  Widget _buildResetButton() {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: _resetToDefault,
+        borderRadius: BorderRadius.circular(18),
+        splashColor: Colors.white.withValues(alpha: .15),
+        highlightColor: Colors.white.withValues(alpha: .08),
+        child: Ink(
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF5F7C7A), Color(0xFF3E5654)],
+              begin: Alignment.topRight,
+              end: Alignment.bottomLeft,
+            ),
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF3E5654).withValues(alpha: .35),
+                blurRadius: 16,
+                offset: const Offset(0, 8),
               ),
             ],
           ),
-          const SizedBox(height: 20),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: _availableColors.map((color) {
-              // ignore: deprecated_member_use
-              final isSelected = color.value == _cardColor.value;
-              return GestureDetector(
-                onTap: () => _saveCardColor(color),
-                child: Container(
-                  width: 60,
-                  height: 60,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: color,
+                    color: Colors.white.withValues(alpha: .16),
                     shape: BoxShape.circle,
-                    border: Border.all(
-                      color: isSelected
-                          ? const Color(0xFF5F7C7A)
-                          : Colors.grey.shade300,
-                      width: isSelected ? 4 : 2,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: .1),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
                   ),
-                  child: isSelected
-                      ? const Icon(
-                          Icons.check,
-                          color: Color(0xFF5F7C7A),
-                          size: 30,
-                        )
-                      : null,
+                  child: const Icon(
+                    Icons.restore_rounded,
+                    color: Colors.white,
+                    size: 20,
+                  ),
                 ),
-              );
-            }).toList(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildNotificationSection() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: .1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: SwitchListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-        secondary: const Icon(
-          Icons.notifications_active_rounded,
-          color: Color(0xFF5F7C7A),
-        ),
-        title: const Text(
-          'تذكيرات الذكر',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF2C3E50),
+                const SizedBox(width: 12),
+                const Text(
+                  'استعادة الإعدادات الافتراضية',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    letterSpacing: .2,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
-        subtitle: const Text('إظهار ذكر مختار كل 4 ساعات'),
-        value: _zikrNotificationsEnabled,
-        activeThumbColor: const Color(0xFF5F7C7A),
-        onChanged: _setZikrNotificationsEnabled,
-      ),
-    );
-  }
-
-  Widget _buildResetButton() {
-    return ElevatedButton.icon(
-      onPressed: _resetToDefault,
-      icon: const Icon(Icons.restore),
-      label: const Text(
-        'استعادة الإعدادات الافتراضية',
-        style: TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: const Color(0xFF5F7C7A),
-        foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(15),
-        ),
-        elevation: 2,
       ),
     );
   }

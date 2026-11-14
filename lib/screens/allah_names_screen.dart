@@ -485,7 +485,9 @@ class AllahNamesScreen extends StatelessWidget {
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: Container(
+      body: Directionality(
+  textDirection: TextDirection.ltr,
+  child: Container(
         decoration: const BoxDecoration(
           image: DecorationImage(
             image: AssetImage('assets/images/Group 6.png'),
@@ -598,6 +600,7 @@ class AllahNamesScreen extends StatelessWidget {
           },
         ),
       ),
-    );
+    ));
+    
   }
 }

@@ -25,7 +25,7 @@ class PrayerLocationService {
           locationSettings: const LocationSettings(
             accuracy: LocationAccuracy.medium,
             distanceFilter: 0,
-            timeLimit: Duration(seconds: 20),
+            timeLimit: Duration(seconds: 8),
           ),
         );
       } catch (_) {
