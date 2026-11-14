@@ -22,38 +22,39 @@ void dailyPrayerRefreshCallback() async {
 class PrayerBackgroundService {
   static const int _dailyRefreshId = 9999;
 
-  Future<void> scheduleDailyPrayers() async {
-    try {
+ Future<void> scheduleDailyPrayers({bool refreshLocation = true}) async {
+  try {
+    if (refreshLocation) {
       await PrayerLocationService().refreshCachedLocation(
         fromBackground: true,
       );
-      final prefs = await SharedPreferences.getInstance();
-      final cachedLat = prefs.getDouble('cached_lat');
-      final cachedLon = prefs.getDouble('cached_lon');
-      final cachedCountry = prefs.getString('cached_country');
-
-      if (cachedLat == null || cachedLon == null) {
-        debugPrint('No cached location found for prayer scheduling');
-        return;
-      }
-
-      final prayerTimes = _calculatePrayerTimesForDays(
-        cachedLat,
-        cachedLon,
-        cachedCountry,
-        days: 7,
-      );
-
-      final notificationService = PrayerNotificationService();
-      await notificationService.ensureInitialized();
-      await notificationService.schedulePrayerNotifications(prayerTimes);
-
-      debugPrint('Daily prayers scheduled successfully');
-    } catch (e) {
-      debugPrint('Error scheduling daily prayers: $e');
     }
-  }
+    final prefs = await SharedPreferences.getInstance();
+    final cachedLat = prefs.getDouble('cached_lat');
+    final cachedLon = prefs.getDouble('cached_lon');
+    final cachedCountry = prefs.getString('cached_country');
 
+    if (cachedLat == null || cachedLon == null) {
+      debugPrint('No cached location found for prayer scheduling');
+      return;
+    }
+
+    final prayerTimes = _calculatePrayerTimesForDays(
+      cachedLat,
+      cachedLon,
+      cachedCountry,
+      days: 7,
+    );
+
+    final notificationService = PrayerNotificationService();
+    await notificationService.ensureInitialized();
+    await notificationService.schedulePrayerNotifications(prayerTimes);
+
+    debugPrint('Daily prayers scheduled successfully');
+  } catch (e) {
+    debugPrint('Error scheduling daily prayers: $e');
+  }
+}
   Map<String, DateTime> _calculatePrayerTimesForDays(
     double lat,
     double lon,

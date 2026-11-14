@@ -236,9 +236,9 @@ class _MoreScreenState extends State<MoreScreen>
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                           colors: [
-                            Color(0xFF1A5F7A),
-                            Color(0xFF159895),
-                            Color(0xFF57C5B6),
+                            Color.fromARGB(255, 147, 115, 77),
+                            Color.fromARGB(209, 154, 123, 79),
+                            Color.fromARGB(255, 193, 164, 117),
                           ]),
                       onTap: () => Navigator.push(
                         context,

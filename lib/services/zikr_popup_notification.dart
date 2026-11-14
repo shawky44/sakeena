@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:android_alarm_manager_plus/android_alarm_manager_plus.dart';
@@ -8,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 @pragma('vm:entry-point')
 void zikrAlarmCallback() async {
   WidgetsFlutterBinding.ensureInitialized();
+  DartPluginRegistrant.ensureInitialized();
   debugPrint('🤲 Zikr alarm triggered at ${DateTime.now()}');
 
   final service = ZikrPopupNotification();
@@ -34,17 +36,62 @@ class ZikrPopupNotification {
   int _notificationId = 2000;
 
   static const int _zikrAlarmId = 8888;
+
+  // ✅ الفاصل ثابت: ذكر كل 3 ساعات
+  static const int zikrIntervalHours = 3;
+
   static const String _zikrEnabledKey = 'zikr_notifications_enabled';
-  static const String _zikrIntervalKey = 'zikr_interval_hours';
+  static const String _zikrNextTimeKey = 'zikr_next_time_ms';
+  // v2 عشان المستخدمين القدام يتهيّأوا تاني على 3 ساعات
+  static const String _zikrInitKey = 'zikr_default_initialized_v2';
+
+  // ✅ يشغل تذكيرات الذكر تلقائيًا أول مرة بس (إلا لو المستخدم كان قافلها قبل كده)
+  Future<void> initializeDefaultsIfNeeded() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool(_zikrInitKey) ?? false) return;
+
+    try {
+      final wasExplicitlyDisabled = prefs.containsKey(_zikrEnabledKey) &&
+          !(prefs.getBool(_zikrEnabledKey) ?? false);
+      if (!wasExplicitlyDisabled) {
+        await start();
+      }
+      await prefs.setBool(_zikrInitKey, true); // بيتسجل بعد النجاح بس
+    } catch (e) {
+      debugPrint('❌ Zikr default init failed, will retry next launch: $e');
+    }
+  }
+
+  // ✅ بتتأكد إن فيه منبه قادم صالح، ولو مفيش بتجدول من غير ما تصفّر الموعد
+  Future<void> ensureScheduled() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!(prefs.getBool(_zikrEnabledKey) ?? false)) return;
+
+    final nextMs = prefs.getInt(_zikrNextTimeKey);
+    final next =
+        nextMs == null ? null : DateTime.fromMillisecondsSinceEpoch(nextMs);
+    final now = DateTime.now();
+
+    final hasValidAlarm = next != null &&
+        next.isAfter(now) &&
+        next.difference(now) <= const Duration(hours: zikrIntervalHours);
+
+    if (hasValidAlarm) return; // فيه منبه قادم، متلمسوش
+
+    await initialize();
+    await _scheduleNextZikr();
+  }
 
   static const List<String> azkarList = [
     'سُبْحَانَ اللهِ وَبِحَمْدِهِ',
     'لَا إِلَهَ إِلَّا اللَّهُ وَحْدَهُ لَا شَرِيكَ لَهُ',
     'اللَّهُمَّ صَلِّ وَسَلِّمْ عَلَى نَبِيِّنَا مُحَمَّد',
     'سُبْحَانَ اللَّهِ وَالْحَمْدُ لِلَّهِ وَلَا إِلَهَ إِلَّا اللَّهُ وَاللَّهُ أَكْبَرُ',
+    'اللَّهُمَّ صَلِّ وَسَلِّمْ عَلَى نَبِيِّنَا مُحَمَّدٍ',
     'لَا حَوْلَ وَلَا قُوَّةَ إِلَّا بِاللَّهِ',
     'أَسْتَغْفِرُ اللَّهَ وَأَتُوبُ إِلَيْهِ',
     'حَسْبِيَ اللَّهُ لَا إِلَهَ إِلَّا هُوَ عَلَيْهِ تَوَكَّلْتُ',
+    'اللَّهُمَّ صَلِّ وَسَلِّمْ عَلَى نَبِيِّنَا مُحَمَّدٍ',
     'رَبِّ اغْفِرْ لِي وَارْحَمْنِي وَاهْدِنِي وَارْزُقْنِي',
     'اللَّهُمَّ إِنِّي أَسْأَلُكَ الْجَنَّةَ وَأَعُوذُ بِكَ مِنَ النَّارِ',
     'سُبْحَانَ اللَّهِ الْعَظِيمِ وَبِحَمْدِهِ',
@@ -52,30 +99,37 @@ class ZikrPopupNotification {
     'حَسْبِيَ اللَّهُ لَا إِلَهَ إِلَّا هُوَ عَلَيْهِ تَوَكَّلْتُ',
     'سُبْحَانَ اللَّهِ وَالْحَمْدُ لِلَّهِ وَلَا إِلَهَ إِلَّا اللَّهُ وَاللَّهُ أَكْبَرُ',
     'اللَّهُمَّ اغْفِرْ لِي وَارْحَمْنِي وَاهْدِنِي وَعَافِنِي وَارْزُقْنِي',
+    'اللَّهُمَّ صَلِّ وَسَلِّمْ عَلَى نَبِيِّنَا مُحَمَّدٍ',
     'رَبِّ اغْفِرْ لِي وَتُبْ عَلَيَّ إِنَّكَ أَنْتَ التَّوَّابُ الرَّحِيمُ',
+    'اللَّهُمَّ صَلِّ وَسَلِّمْ عَلَى نَبِيِّنَا مُحَمَّدٍ',
     'لَا حَوْلَ وَلَا قُوَّةَ إِلَّا بِاللَّهِ',
     'اللَّهُمَّ أَنْتَ رَبِّي لَا إِلَهَ إِلَّا أَنْتَ',
     'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ عَدَدَ خَلْقِهِ',
     'اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنَ الْهَمِّ وَالْحَزَنِ',
+    'اللَّهُمَّ صَلِّ وَسَلِّمْ عَلَى نَبِيِّنَا مُحَمَّدٍ',
     'رَبَّنَا آتِنَا فِي الدُّنْيَا حَسَنَةً وَفِي الْآخِرَةِ حَسَنَةً',
     'اللَّهُمَّ إِنِّي أَسْأَلُكَ الْعَفْوَ وَالْعَافِيَةَ',
     'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ سُبْحَانَ اللَّهِ الْعَظِيمِ',
     'اللَّهُمَّ اجْعَلْنِي مِنَ التَّوَّابِينَ وَاجْعَلْنِي مِنَ الْمُتَطَهِّرِينَ',
     'رَبِّ زِدْنِي عِلْمًا',
     'اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنَ الْبُخْلِ',
+    'اللَّهُمَّ صَلِّ وَسَلِّمْ عَلَى نَبِيِّنَا مُحَمَّدٍ',
     'سُبْحَانَ الْمَلِكِ الْقُدُّوسِ',
     'اللَّهُمَّ أَصْلِحْ لِي دِينِيَ الَّذِي هُوَ عِصْمَةُ أَمْرِي',
     'رَبَّنَا لَا تُزِغْ قُلُوبَنَا بَعْدَ إِذْ هَدَيْتَنَا',
     'اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنَ الْكَسَلِ',
+    'اللَّهُمَّ صَلِّ وَسَلِّمْ عَلَى نَبِيِّنَا مُحَمَّدٍ',
     'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ عَدَدَ خَلْقِهِ وَرِضَا نَفْسِهِ',
     'اللَّهُمَّ اهْدِنِي وَسَدِّدْنِي',
     'رَبِّ اشْرَحْ لِي صَدْرِي وَيَسِّرْ لِي أَمْرِي',
     'اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنْ عَذَابِ الْقَبْرِ',
+    'اللَّهُمَّ صَلِّ وَسَلِّمْ عَلَى نَبِيِّنَا مُحَمَّدٍ',
     'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ عَدَدَ مَا خَلَقَ',
     'اللَّهُمَّ اجْعَلْ قَلْبِي بَارًّا',
     'رَبَّنَا اغْفِرْ لَنَا ذُنُوبَنَا وَكَفِّرْ عَنَّا سَيِّئَاتِنَا',
     'اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنَ الْجُوعِ',
     'سُبْحَانَ اللَّهِ الْعَظِيمِ وَبِحَمْدِهِ',
+    'اللَّهُمَّ صَلِّ وَسَلِّمْ عَلَى نَبِيِّنَا مُحَمَّدٍ',
     'اللَّهُمَّ ارْزُقْنِي حُبَّكَ وَحُبَّ مَنْ يَنْفَعُنِي حُبُّهُ',
     'رَبِّ اجْعَلْنِي مُقِيمَ الصَّلَاةِ',
     'اللَّهُمَّ طَهِّرْ قَلْبِي مِنَ النِّفَاقِ',
@@ -84,11 +138,13 @@ class ZikrPopupNotification {
     'رَبَّنَا لَا تُؤَاخِذْنَا إِنْ نَسِينَا أَوْ أَخْطَأْنَا',
     'اللَّهُمَّ احْفَظْنِي بِدِينِكَ',
     'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ زِنَةَ عَرْشِهِ',
+    'اللَّهُمَّ صَلِّ وَسَلِّمْ عَلَى نَبِيِّنَا مُحَمَّدٍ',
     'اللَّهُمَّ اجْعَلْنِي شَاكِرًا لِنِعَمِكَ',
     'رَبِّ أَعُوذُ بِكَ مِنْ هَمَزَاتِ الشَّيَاطِينِ',
     'اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنَ الْفَقْرِ',
     'سُبْحَانَ اللَّهِ الْعَظِيمِ وَبِحَمْدِهِ',
     'اللَّهُمَّ انْصُرْنِي عَلَى مَنْ بَغَى عَلَيَّ',
+    'اللَّهُمَّ صَلِّ وَسَلِّمْ عَلَى نَبِيِّنَا مُحَمَّدٍ',
     'رَبَّنَا آمَنَّا فَاغْفِرْ لَنَا وَارْحَمْنَا',
     'اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنَ الْغَمَّ وَالْحُزْنَ',
     'سُبْحَانَ اللَّهِ الْعَلِيِّ الْأَعْلَى',
@@ -96,6 +152,7 @@ class ZikrPopupNotification {
     'رَبِّ إِنِّي لِمَا أَنْزَلْتَ إِلَيَّ مِنْ خَيْرٍ فَقِيرٌ',
     'اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنَ الْبَرَصِ',
     'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ عَدَدَ الشَّوْكِ وَالشَّجَرِ',
+    'اللَّهُمَّ صَلِّ وَسَلِّمْ عَلَى نَبِيِّنَا مُحَمَّدٍ',
     'اللَّهُمَّ ارْحَمْنِي بِالْقُرْآنِ',
     'رَبَّنَا ظَلَمْنَا أَنْفُسَنَا وَإِنْ لَمْ تَغْفِرْ لَنَا',
     'اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنَ الْجُبْنِ',
@@ -103,9 +160,11 @@ class ZikrPopupNotification {
     'اللَّهُمَّ اجْعَلْنِي مِنَ الْمُتَوَاضِعِينَ',
     'رَبِّ اغْفِرْ وَارْحَمْ وَأَنْتَ خَيْرُ الرَّاحِمِينَ',
     'اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنْ شَرِّ مَا عَمِلْتُ',
+    'اللَّهُمَّ صَلِّ وَسَلِّمْ عَلَى نَبِيِّنَا مُحَمَّدٍ',
     'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ عَدَدَ مَا كَانَ',
     'اللَّهُمَّ ارْزُقْنِي الْعِلْمَ النَّافِعَ',
     'رَبَّنَا هَبْ لَنَا مِنْ أَزْوَاجِنَا وَذُرِّيَّاتِنَا',
+    'اللَّهُمَّ صَلِّ وَسَلِّمْ عَلَى نَبِيِّنَا مُحَمَّدٍ',
     'اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنَ الْعَجْزِ',
     'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ عَدَدَ مَا هُوَ خَالِقٌ',
     'اللَّهُمَّ اجْعَلْنِي مِنَ الْمُسْتَغْفِرِينَ',
@@ -113,14 +172,17 @@ class ZikrPopupNotification {
     'اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنْ فِتْنَةِ النَّارِ',
     'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ عَدَدَ الْأَنْهَارِ',
     'اللَّهُمَّ ارْحَمْنِي وَوَالِدَيَّ',
+    'اللَّهُمَّ صَلِّ وَسَلِّمْ عَلَى نَبِيِّنَا مُحَمَّدٍ',
     'رَبَّنَا تَقَبَّلْ مِنَّا إِنَّكَ أَنْتَ السَّمِيعُ الْعَلِيمُ',
     'اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنَ الْغِرَّةِ',
     'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ عَدَدَ الْجَمَالِ',
+    'اللَّهُمَّ صَلِّ وَسَلِّمْ عَلَى نَبِيِّنَا مُحَمَّدٍ',
     'اللَّهُمَّ اجْعَلْنِي مِنَ الصَّابِرِينَ',
     'رَبِّ اهْدِنِي وَأَصْلِحْ لِي دِينِي',
     'اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنَ الْخَوْفِ',
     'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ عَدَدَ الْأَنْعَامِ',
     'اللَّهُمَّ ارْزُقْنِي الشُّكْرَ',
+    'اللَّهُمَّ صَلِّ وَسَلِّمْ عَلَى نَبِيِّنَا مُحَمَّدٍ',
     'رَبَّنَا لَا تَجْعَلْنَا مَعَ الْقَوْمِ الظَّالِمِينَ',
     'اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنَ الْحِرْمَانِ',
     'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ عَدَدَ الْأَطْيَارِ',
@@ -128,12 +190,14 @@ class ZikrPopupNotification {
     'رَبِّ اجْعَلْنِي شَاكِرًا لِنِعْمَتِكَ',
     'اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنَ الْغَضَبِ',
     'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ عَدَدَ الْحِجَارَةِ',
+    'اللَّهُمَّ صَلِّ وَسَلِّمْ عَلَى نَبِيِّنَا مُحَمَّدٍ',
     'اللَّهُمَّ ارْزُقْنِي الرِّضَا',
     'رَبَّنَا تَوَفَّنَا مُسْلِمِينَ',
     'اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنَ الْخِزْيِ',
     'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ عَدَدَ الْجَنَّاتِ',
     'اللَّهُمَّ اجْعَلْنِي مِنَ الْمُؤْمِنِينَ',
     'رَبِّ انْصُرْنِي عَلَى الْقَوْمِ الْكَافِرِينَ',
+    'اللَّهُمَّ صَلِّ وَسَلِّمْ عَلَى نَبِيِّنَا مُحَمَّدٍ',
     'اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنَ الْفَشَلِ',
     'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ عَدَدَ الْأَرْضِ',
     'اللَّهُمَّ ارْزُقْنِي الْوَرَعَ',
@@ -142,6 +206,7 @@ class ZikrPopupNotification {
     'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ عَدَدَ السَّمَاوَاتِ',
     'اللَّهُمَّ اجْعَلْنِي مِنَ الْمُخْبِتِينَ',
     'رَبِّ ارْحَمْنِي وَوَالِدَيَّ وَالْمُؤْمِنِينَ',
+    'اللَّهُمَّ صَلِّ وَسَلِّمْ عَلَى نَبِيِّنَا مُحَمَّدٍ',
     'اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنَ الْبَغْيِ',
     'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ عَدَدَ الْكَلِمَاتِ',
     'اللَّهُمَّ ارْزُقْنِي التَّوْبَةَ',
@@ -150,17 +215,20 @@ class ZikrPopupNotification {
     'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ عَدَدَ الْأَيَّامِ',
     'اللَّهُمَّ اجْعَلْنِي مِنَ الْمُسْلِمِينَ',
     'رَبِّ اجْعَلْنِي مِنَ الْخَاشِعِينَ',
+    'اللَّهُمَّ صَلِّ وَسَلِّمْ عَلَى نَبِيِّنَا مُحَمَّدٍ',
     'اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنَ الْوِزْرِ',
     'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ عَدَدَ اللَّيَالِي',
     'اللَّهُمَّ ارْزُقْنِي الْإِيمَانَ',
     'رَبَّنَا اغْفِرْ لَنَا وَلِوَالِدَيْنَا وَلِلْمُؤْمِنِينَ',
     'اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنَ الْغُلُولِ',
+    'اللَّهُمَّ صَلِّ وَسَلِّمْ عَلَى نَبِيِّنَا مُحَمَّدٍ',
     'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ عَدَدَ الْعُصْفُورِ',
     'اللَّهُمَّ اجْعَلْنِي مِنَ الْمُطِيعِينَ',
     'رَبِّ ارْزُقْنِي الْعِلْمَ النَّافِعَ',
     'اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنَ الْخِذْلَانِ',
     'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ عَدَدَ النَّبَاتَاتِ',
     'اللَّهُمَّ ارْزُقْنِي الصَّبْرَ',
+    'اللَّهُمَّ صَلِّ وَسَلِّمْ عَلَى نَبِيِّنَا مُحَمَّدٍ',
     'رَبَّنَا آتِنَا مِنْ لَدُنْكَ رَحْمَةً',
     'اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنَ الْفِتْنَةِ',
     'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ عَدَدَ الْحَيَوَاتِ',
@@ -169,12 +237,15 @@ class ZikrPopupNotification {
     'اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنَ الْخِزْيِ',
     'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ عَدَدَ الْخَلَائِقِ',
     'اللَّهُمَّ ارْزُقْنِي الْخُشُوعَ',
+    'اللَّهُمَّ صَلِّ وَسَلِّمْ عَلَى نَبِيِّنَا مُحَمَّدٍ',
     'رَبَّنَا لَا تُزِغْ قُلُوبَنَا',
     'اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنَ الْغَفْلَةِ',
     'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ عَدَدَ مَا فِي السَّمَاوَاتِ',
     'اللَّهُمَّ اجْعَلْنِي مِنَ الْمُتَّقِينَ',
+    'اللَّهُمَّ صَلِّ وَسَلِّمْ عَلَى نَبِيِّنَا مُحَمَّدٍ',
     'رَبِّ ارْحَمْنِي وَاهْدِنِي',
     'اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنَ الْهَمِّ',
+    'اللَّهُمَّ صَلِّ وَسَلِّمْ عَلَى نَبِيِّنَا مُحَمَّدٍ',
   ];
 
   Future<void> initialize() async {
@@ -229,40 +300,57 @@ class ZikrPopupNotification {
     debugPrint('✅ Zikr channel created');
   }
 
-  // ✅ بدء الأذكار باستخدام AndroidAlarmManager
-  Future<void> start({int intervalHours = 4}) async {
+  // ✅ بدء الأذكار (كل 3 ساعات) باستخدام AndroidAlarmManager
+  Future<void> start() async {
     await initialize();
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_zikrEnabledKey, true);
-    await prefs.setInt(_zikrIntervalKey, intervalHours);
     await AndroidAlarmManager.cancel(_zikrAlarmId);
 
-    debugPrint(
-        '🚀 Starting zikr popup every $intervalHours hours using AlarmManager');
+    debugPrint('🚀 Starting zikr popup every $zikrIntervalHours hours');
 
     await _scheduleNextZikr();
   }
 
-  // ✅ جدولة الذكر القادم
   Future<void> _scheduleNextZikr() async {
     final prefs = await SharedPreferences.getInstance();
     if (!(prefs.getBool(_zikrEnabledKey) ?? false)) return;
-    final intervalHours = prefs.getInt(_zikrIntervalKey) ?? 4;
 
-    final nextZikrTime = DateTime.now().add(Duration(hours: intervalHours));
+    final nextZikrTime =
+        DateTime.now().add(const Duration(hours: zikrIntervalHours));
 
-    await AndroidAlarmManager.oneShotAt(
-      nextZikrTime,
-      _zikrAlarmId,
-      zikrAlarmCallback,
-      exact: true,
-      wakeup: true,
-      allowWhileIdle: true,
-      rescheduleOnReboot: true,
-    );
-
-    debugPrint('⏰ Next zikr scheduled for: $nextZikrTime');
+    try {
+      await AndroidAlarmManager.oneShotAt(
+        nextZikrTime,
+        _zikrAlarmId,
+        zikrAlarmCallback,
+        exact: true,
+        wakeup: true,
+        allowWhileIdle: true,
+        rescheduleOnReboot: true,
+      );
+      await prefs.setInt(_zikrNextTimeKey, nextZikrTime.millisecondsSinceEpoch);
+      debugPrint('⏰ Next zikr scheduled for: $nextZikrTime');
+    } catch (e) {
+      debugPrint('❌ Exact zikr schedule failed: $e — falling back to inexact');
+      // fallback: جدولة غير دقيقة بدل ما السلسلة توقف خالص
+      try {
+        await AndroidAlarmManager.oneShotAt(
+          nextZikrTime,
+          _zikrAlarmId,
+          zikrAlarmCallback,
+          exact: false,
+          wakeup: true,
+          allowWhileIdle: true,
+          rescheduleOnReboot: true,
+        );
+        await prefs.setInt(
+            _zikrNextTimeKey, nextZikrTime.millisecondsSinceEpoch);
+      } catch (e2) {
+        debugPrint('❌ Inexact zikr schedule also failed: $e2');
+      }
+    }
   }
 
   // ✅ إيقاف الأذكار
@@ -271,6 +359,7 @@ class ZikrPopupNotification {
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_zikrEnabledKey, false);
+    await prefs.remove(_zikrNextTimeKey);
 
     debugPrint('⛔ Zikr popup stopped');
   }
@@ -286,7 +375,7 @@ class ZikrPopupNotification {
     try {
       await _notifications.show(
         _notificationId,
-        '🤲 اذكر الله يذكرك',
+        '🤲اذكر الله يذكرك',
         zikr,
         NotificationDetails(
           android: AndroidNotificationDetails(
@@ -298,7 +387,7 @@ class ZikrPopupNotification {
             styleInformation: BigTextStyleInformation(
               zikr,
               htmlFormatBigText: false,
-              contentTitle: '🤲 اذكر الله يذكرك',
+              contentTitle: '🤲اذكر الله يذكرك',
               htmlFormatContentTitle: false,
             ),
             color: const Color(0xFF6B8F7F),

@@ -11,6 +11,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -20,7 +21,13 @@ void main() async {
   await AndroidAlarmManager.initialize();
 
   await PrayerNotificationService().ensureInitialized();
-  await ZikrPopupNotification().initialize();
+
+  // ✅ الأذكار كل 3 ساعات: تهيئة أول مرة + التأكد من وجود منبه قادم
+  // (من غير ما نصفّر الموعد في كل فتح للتطبيق)
+  final zikrService = ZikrPopupNotification();
+  await zikrService.initialize();
+  await zikrService.initializeDefaultsIfNeeded();
+  await zikrService.ensureScheduled();
 
   final backgroundService = PrayerBackgroundService();
   await backgroundService.scheduleNextDayRefresh();
